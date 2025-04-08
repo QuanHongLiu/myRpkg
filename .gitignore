@@ -1,9 +1,7 @@
 .Rproj.user
-.Rhistory
-.Rdata
-.httr-oauth
-.DS_Store
-.quarto
-.RData
-/*.tar.gz
 .Rproj
+.Rbuildignore
+.Rhistory
+.RData
+.DS_Store
+/*.tar.gz
