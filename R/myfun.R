@@ -1,0 +1,199 @@
+# 提取模型结果
+#' Title
+#'
+#' @param x
+#' @param outcome
+#' @param model
+#' @param results
+#'
+#' @return
+#' @export
+#'
+#' @examples
+extract_model_results_conf <- function(x, outcome, model, results) {
+  # 提取模型系数
+  model_summary <- broom.mixed::tidy(model, conf.int = TRUE)
+  model_summary <- cbind(outcome, model_summary)
+  model_summary <- model_summary[grepl(x, model_summary$term), ]
+  names(model_summary)[names(model_summary)=='term'] <- 'exposure'
+
+  # 提取模型通过 bootstrap 得到的置信区间
+  model_confint <- confint(model)
+  model_confint <- as.data.frame(model_confint)
+  model_confint <- model_confint[grepl(x, rownames(model_confint)),]
+
+  # 合并结果
+  res <- cbind(model_summary, model_confint)
+
+  # 合并到 results
+  if (is.data.frame(results)) {
+    results <- bind_rows(results, res)
+  } else {
+    results <- data.frame()
+    results <- bind_rows(results, res)
+  }
+
+  # 返回结果
+  return(results)
+}
+
+
+# 提取模型结果
+#' Title
+#'
+#' @param x
+#' @param outcome
+#' @param model
+#' @param results
+#'
+#' @return
+#' @export
+#'
+#' @examples
+extract_model_results_tidy <- function(x, outcome, model, results) {
+  # 提取模型系数
+  model_summary <- broom.mixed::tidy(model, conf.int = TRUE)
+  model_summary <- cbind(outcome, model_summary)
+  model_summary <- model_summary[grepl(x, model_summary$term), ]
+  names(model_summary)[names(model_summary)=='term'] <- 'exposure'
+
+  if (is.data.frame(results)) {
+    results <- bind_rows(results, model_summary)
+  } else {
+    results <- data.frame()
+    results <- bind_rows(results, model_summary)
+  }
+
+  # 返回结果
+  return(results)
+}
+
+
+
+# 统一数据框的变量类型
+#' Title
+#'
+#' @param target_df
+#' @param reference_df
+#'
+#' @return
+#' @export
+#'
+#' @examples
+harmonise_types <- function(target_df, reference_df) {
+  # 获取reference_df的列类型
+  ref_types <- sapply(reference_df, class)
+
+  # 遍历target_df的每一列
+  for (col in names(target_df)) {
+    if (col %in% names(ref_types)) {
+      # 根据reference_df中的类型转换
+      if (ref_types[[col]] == "numeric") {
+        target_df[[col]] <- as.numeric(target_df[[col]])
+      } else if (ref_types[[col]] == "character") {
+        target_df[[col]] <- as.character(target_df[[col]])
+      } else if (ref_types[[col]] == "factor") {
+        target_df[[col]] <- as.factor(target_df[[col]])
+      } else if (ref_types[[col]] == "logical") {
+        target_df[[col]] <- as.logical(target_df[[col]])
+      } else if (ref_types[[col]] == "integer") {
+        target_df[[col]] <- as.integer(target_df[[col]])
+      }
+    }
+  }
+  return(target_df)
+}
+
+
+
+
+
+# 定义一个通用的分位数切割函数
+#' Title
+#'
+#' @param dataframe
+#' @param var_name
+#' @param n
+#'
+#' @return
+#' @export
+#'
+#' @examples
+quartile_cut <- function(dataframe, var_name, n) {
+  # 检测 dataframe
+  if (!is.data.frame(df)) {
+    stop("Error: The input df must be a data frame.")
+  }
+
+  # 处理 var_name
+  result <- try({
+    if (is.character(var_name)) {
+      var_name <- var_name
+    }
+  }, silent = TRUE)
+  if (inherits(result, "try-error")) {
+    var_name <- deparse(substitute(var_name))
+  }
+
+  # 检查 var_name 是否存在于 dataframe
+  if (!exists(var_name, where = dataframe)) {
+    stop(paste("Object", var_name, "not found in dataframe"))
+  }
+
+  # 检查 变量是否为数值
+  dataframe[[paste0(var_name, n)]] <- cut(dataframe[[var_name]],
+                                          breaks = quantile(dataframe[[var_name]],
+                                                            probs = seq(0, 1, 1/n),na.rm = T),
+                                          include.lowest = TRUE,
+                                          labels = as.character(1:n))
+  return(dataframe)
+}
+
+
+
+
+#' Title
+#'
+#' @param x
+#' @param file
+#' @param sheetName
+#' @param row_height
+#' @param auto_width
+#' @param ...
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+write_xlsx <- function(
+    x,                 # 要导出的数据框
+    file,              # 文件路径
+    sheetName = "Sheet1",  # 工作表名
+    row_height = 18,   # 行高（默认18像素）
+    auto_width = TRUE, # 是否自动调整列宽
+    ...                # 其他透传给write.xlsx的参数（如startCol, borders等）
+) {
+  # 创建Workbook对象并写入数据
+  wb <- createWorkbook()
+  addWorksheet(wb, sheetName = sheetName)
+  writeData(wb, sheet = sheetName, x = x, ...)  # 透传所有额外参数
+
+  # 自动调整行高（含表头）
+  setRowHeights(
+    wb, sheet = sheetName,
+    rows = 1:(nrow(x) + 1),
+    heights = row_height
+  )
+
+  # 自动调整列宽（基于内容）
+  if (auto_width) {
+    setColWidths(
+      wb, sheet = sheetName,
+      cols = 1:ncol(x),
+      widths = "auto"
+    )
+  }
+
+  # 保存文件
+  saveWorkbook(wb, file = file, overwrite = TRUE)
+}
