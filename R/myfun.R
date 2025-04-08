@@ -197,3 +197,76 @@ write_xlsx <- function(
   # 保存文件
   saveWorkbook(wb, file = file, overwrite = TRUE)
 }
+
+
+
+
+
+#' Title
+#'
+#' @param data
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+process_ukb_data <- function(data){
+  # 0. 读取 var_dict 文件
+  var_dict <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/UKB_variable_dictionary.csv"),
+                       col_types = cols(
+                         Column = col_character(),
+                         UDI = col_character(),
+                         UDI_url = col_character(),
+                         Count = col_integer(),
+                         Type = col_character(),
+                         Description = col_character(),
+                         Description_url = col_character(),
+                         Download_date = col_character()
+                       ))
+
+
+  # 1. 更改变量类型
+  coding_dir <- paste0(system.file(package = 'myRpkg'),"/extdata/codings")
+
+  var_type <- setNames(as.list(var_dict$Type), paste0("n_", gsub("[-.]", "_", var_dict$UDI)))
+  var_description <- setNames(as.list(var_dict$Description), paste0("n_", gsub("[-.]", "_", var_dict$UDI)))
+
+  data[] <- lapply(names(data), function(col_name) {
+    if (col_name %in% names(var_type)) {
+      if (var_type[[col_name]] %in% c("Categorical (multiple)", "Categorical (single)")) {
+        print(col_name)
+        coding_num <- str_extract(var_description[[col_name]], "(?<=data-coding)\\d+")    # 提取数据编码编号
+        print(coding_num)
+        coding_file <- file.path(coding_dir, paste0("data-coding", coding_num, ".tsv"))   # 拼接文件路径
+        print(coding_file)
+        coding_map <- read_tsv(coding_file, show_col_types = FALSE) %>%  # 读取数据编码文件
+          mutate(coding = as.character(coding))  # 确保类型匹配
+
+        # factor
+        data[[col_name]] <- as.factor(data[[col_name]])
+
+        # 更改名字
+        data[[col_name]] <- set_labels(
+          data[[col_name]],
+          labels = setNames(coding_map$coding, coding_map$meaning)
+        )
+
+        return(data[[col_name]])
+      } else if (var_type[[col_name]] %in%  c("Sequence", "Integer", "Continuous")){
+        return(as.numeric(data[[col_name]]))
+      } else {
+        return(data[[col_name]])
+      }
+    }
+    return(data[[col_name]]) # 如果不满足条件，返回原列
+  })
+
+  # 2. 添加变量标签（精确匹配）
+  var_labels <- setNames(as.list(var_dict$Description), paste0("n_", gsub("[-.]", "_", var_dict$UDI)))
+  label(data) <- lapply(names(data), function(x) {
+    if (x %in% names(var_labels)) var_labels[[x]] else ""
+  })
+  return(data)
+}
+
+
