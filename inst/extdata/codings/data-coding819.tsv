@@ -1,0 +1,7 @@
+coding	meaning
+1900-01-01	Code has no event date
+1901-01-01	Code has event date before participant's date of birth
+1902-02-02	Code has event date matching participant's date of birth
+1903-03-03	Code has event date after participant's date of birth and falls in the same calendar year as date of birth
+1909-09-09	Code has event date in the future and is presumed to be a place-holder or other system default
+2037-07-07	Code has event date in the future and is presumed to be a place-holder or other system default

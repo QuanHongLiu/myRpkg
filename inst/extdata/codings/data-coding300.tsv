@@ -1,0 +1,8 @@
+coding	meaning
+0	Self-reported only
+1	Hospital admission
+2	Death only
+11	Hospital primary
+12	Death primary
+21	Hospital secondary
+22	Death contributory

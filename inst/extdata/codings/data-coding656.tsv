@@ -1,0 +1,8 @@
+coding	meaning
+0	Unspecified
+1	Faulty alignment of adjacent slabs
+2	Body movements during scan
+3	Metal
+4	Signal swap
+5	Region being partly outside field of view
+6	Low signal-to-noise ratio
