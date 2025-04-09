@@ -151,7 +151,7 @@ quartile_cut <- function(dataframe, var_name, n) {
 
 
 
-
+# 自动调整列宽导出xlsx
 #' Title
 #'
 #' @param x
@@ -202,6 +202,73 @@ write_xlsx <- function(
 
 
 
+
+# process_ukb_data <- function(data){
+#   # 0. 读取 var_dict 文件
+#   var_dict <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/UKB_variable_dictionary.csv"),
+#                        col_types = cols(
+#                          Column = col_character(),
+#                          UDI = col_character(),
+#                          UDI_url = col_character(),
+#                          Count = col_integer(),
+#                          Type = col_character(),
+#                          Description = col_character(),
+#                          Description_url = col_character(),
+#                          Download_date = col_character()
+#                        ))
+#
+#
+#   # 1. 更改变量类型
+#   coding_dir <- paste0(system.file(package = 'myRpkg'),"/extdata/codings")
+#
+#   var_type <- setNames(as.list(var_dict$Type), paste0("n_", gsub("[-.]", "_", var_dict$UDI)))
+#   var_description <- setNames(as.list(var_dict$Description), paste0("n_", gsub("[-.]", "_", var_dict$UDI)))
+#
+#   data[] <- lapply(names(data), function(col_name) {
+#     if (col_name %in% names(var_type)) {
+#       if (var_type[[col_name]] %in% c("Categorical (multiple)", "Categorical (single)")) {
+#         print(col_name)
+#         coding_num <- str_extract(var_description[[col_name]], "(?<=data-coding)\\d+")    # 提取数据编码编号
+#         print(coding_num)
+#         coding_file <- file.path(coding_dir, paste0("data-coding", coding_num, ".tsv"))   # 拼接文件路径
+#         print(coding_file)
+#         coding_map <- read_tsv(coding_file, show_col_types = FALSE) %>%  # 读取数据编码文件
+#           mutate(coding = as.character(coding))  # 确保类型匹配
+#
+#         # factor
+#         data[[col_name]] <- as.factor(data[[col_name]])
+#
+#         # 更改名字
+#         data[[col_name]] <- set_labels(
+#           data[[col_name]],
+#           labels = setNames(coding_map$coding, coding_map$meaning)
+#         )
+#
+#         return(data[[col_name]])
+#       } else if (var_type[[col_name]] %in%  c("Sequence", "Integer", "Continuous")){
+#         return(as.numeric(data[[col_name]]))
+#       } else {
+#         return(data[[col_name]])
+#       }
+#     }
+#     return(data[[col_name]]) # 如果不满足条件，返回原列
+#   })
+#
+#   # 2. 添加变量标签（精确匹配）
+#   var_labels <- setNames(as.list(var_dict$Description), paste0("n_", gsub("[-.]", "_", var_dict$UDI)))
+#   label(data) <- lapply(names(data), function(x) {
+#     if (x %in% names(var_labels)) var_labels[[x]] else ""
+#   })
+#   return(data)
+# }
+#
+
+
+
+
+
+
+
 #' Title
 #'
 #' @param data
@@ -211,62 +278,62 @@ write_xlsx <- function(
 #'
 #' @examples
 process_ukb_data <- function(data){
-  # 0. 读取 var_dict 文件
-  var_dict <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/UKB_variable_dictionary.csv"),
-                       col_types = cols(
-                         Column = col_character(),
-                         UDI = col_character(),
-                         UDI_url = col_character(),
-                         Count = col_integer(),
-                         Type = col_character(),
-                         Description = col_character(),
-                         Description_url = col_character(),
-                         Download_date = col_character()
-                       ))
-
-
-  # 1. 更改变量类型
-  coding_dir <- paste0(system.file(package = 'myRpkg'),"/extdata/codings")
-
-  var_type <- setNames(as.list(var_dict$Type), paste0("n_", gsub("[-.]", "_", var_dict$UDI)))
-  var_description <- setNames(as.list(var_dict$Description), paste0("n_", gsub("[-.]", "_", var_dict$UDI)))
-
+  # 0. 读取 data_showcase 文件
+  data_showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Data_Dictionary_Showcase.csv"))
+  # 1. 读取 codings_showcase 文件
+  codings_showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Codings_Showcase.csv"))
+  # 2. 更改变量类型
+  var_type <- setNames(as.list(data_showcase$ValueType), data_showcase$FieldID)
+  var_coding <- setNames(as.list(data_showcase$Coding), data_showcase$FieldID)
   data[] <- lapply(names(data), function(col_name) {
-    if (col_name %in% names(var_type)) {
-      if (var_type[[col_name]] %in% c("Categorical (multiple)", "Categorical (single)")) {
-        print(col_name)
-        coding_num <- str_extract(var_description[[col_name]], "(?<=data-coding)\\d+")    # 提取数据编码编号
-        print(coding_num)
-        coding_file <- file.path(coding_dir, paste0("data-coding", coding_num, ".tsv"))   # 拼接文件路径
-        print(coding_file)
-        coding_map <- read_tsv(coding_file, show_col_types = FALSE) %>%  # 读取数据编码文件
-          mutate(coding = as.character(coding))  # 确保类型匹配
-
-        # factor
+    filed_id <-  strsplit(col_name, "_")[[1]][2]
+    if (filed_id %in% names(var_type)) {
+      if (var_type[[filed_id]] %in% c("Categorical multiple", "Categorical single")) {
         data[[col_name]] <- as.factor(data[[col_name]])
-
-        # 更改名字
+        coding_map <- codings_showcase[codings_showcase$coding_id == var_coding[[filed_id]],]
+        # 分类变量 label
         data[[col_name]] <- set_labels(
           data[[col_name]],
           labels = setNames(coding_map$coding, coding_map$meaning)
         )
-
         return(data[[col_name]])
-      } else if (var_type[[col_name]] %in%  c("Sequence", "Integer", "Continuous")){
+      } else if (var_type[[filed_id]] %in%  c("Integer", "Continuous")){
         return(as.numeric(data[[col_name]]))
       } else {
         return(data[[col_name]])
       }
+    } else if (filed_id == "eid"){
+      return(as.numeric(data[[col_name]]))
     }
     return(data[[col_name]]) # 如果不满足条件，返回原列
   })
 
   # 2. 添加变量标签（精确匹配）
-  var_labels <- setNames(as.list(var_dict$Description), paste0("n_", gsub("[-.]", "_", var_dict$UDI)))
-  label(data) <- lapply(names(data), function(x) {
-    if (x %in% names(var_labels)) var_labels[[x]] else ""
+  var_labels <- setNames(
+    as.list(paste0(data_showcase$Field,
+                   ifelse(is.na(data_showcase$Units), "",
+                          paste0(", ", data_showcase$Units)))),
+    data_showcase$FieldID
+  )
+
+  label(data) <- lapply(names(data), function(col_name) {
+    filed_id <-  strsplit(col_name, "_")[[1]][2]
+
+    if (filed_id %in% names(var_labels)) var_labels[[filed_id]] else ""
+  })
+
+  label(data) <- lapply(names(data), function(col_name) {
+    filed_id <- strsplit(col_name, "_")[[1]][2]
+
+    if (filed_id %in% names(var_labels)) {
+      var_labels[[filed_id]]  # 如果存在于var_labels中
+    } else if (filed_id == "eid") {   # 添加第一个else if条件
+      # 处理condition1为TRUE的情况
+      "Encoded anonymised participant ID"
+    } else {
+      ""  # 默认情况
+    }
   })
   return(data)
 }
-
 
