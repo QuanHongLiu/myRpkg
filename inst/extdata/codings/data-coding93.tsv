@@ -1,4 +1,0 @@
-coding	meaning
-0	Dataset previously flagged as unreliable, now believed valid
-1	Unreliable due to unexpectedly small size
-2	Unreliable due to unexpectedly large size
