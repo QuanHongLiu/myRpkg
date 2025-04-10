@@ -2,6 +2,7 @@
 
 export(extract_model_results_conf)
 export(extract_model_results_tidy)
+export(format_sas_code)
 export(harmonise_types)
 export(process_ukb_data)
 export(quartile_cut)
