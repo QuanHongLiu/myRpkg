@@ -341,6 +341,7 @@ process_ukb_data <- function(data){
 
 
 
+
 #' Title
 #'
 #' @param field_list
@@ -440,7 +441,7 @@ format_sas_code <- function(field_list,output_path){
 
 
   # 插入到模板中
-  final_code <- glue::glue(sas_template,
+  final_code <- glue(sas_template,
                      ukb_20201126 = paste(ukb_20201126, collapse = "\n  "),
                      ukb_20201222 = paste(ukb_20201222, collapse = "\n  "),
                      ukb_20211013 = paste(ukb_20211013, collapse = "\n  "),
@@ -449,3 +450,6 @@ format_sas_code <- function(field_list,output_path){
   # 输出为SAS文件
   writeLines(final_code, output_path)
 }
+
+
+
