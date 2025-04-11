@@ -271,8 +271,8 @@ process_ukb_data <- function(data){
 format_sas_code <- function(field_list,output_dir_prefix){
   # 提取用户需要的 filed 的详细信息
   Dictionary_Showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Data_Dictionary_Showcase.csv"))
-  Dictionary_Showcase <- Dictionary_Showcase[Dictionary_Showcase$FieldID %in% field_list, c("FieldID","Field_zh","Field","Notes","Value_type","Units","Stability","Instances","Array")]
-  write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,".xlsx"))
+  Dictionary_Showcase <- Dictionary_Showcase[Dictionary_Showcase$FieldID %in% field_list, c("FieldID","Field_zh","Field","ValueType","Units","Stability","Instances","Array","Notes")]
+  write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,"_showcase.xlsx"))
 
 
   # 读取 UKB_variable_dictionary 文件
@@ -286,8 +286,12 @@ format_sas_code <- function(field_list,output_dir_prefix){
 
   print(paste0("请求提取 ",length(field_list),"个变量"))
   print(paste0("共有 ",sum(field_list %in% sapply(strsplit(data_showcase$UDI, "-"), function(x) x[1]))," 个变量在数据库中"))
-  print(paste0("数据库不包含变量：",field_list[!field_list %in% sapply(strsplit(data_showcase$UDI, "-"), function(x) x[1])]))
-
+  missing_vars <- field_list[!field_list %in% sapply(strsplit(data_showcase$UDI, "-"), function(x) x[1])]
+  if (length(missing_vars) > 0) {
+    cat(paste0("数据库不包含变量：", paste(missing_vars, collapse = ", "), "\n"))
+  } else {
+    cat("所有变量均存在。\n")
+  }
 
   # 生成变量类型
   data_showcase$code <- paste0("@",data_showcase$Start_pos," ",data_showcase$Variable_name," ",data_showcase$Variable_Type)
@@ -358,7 +362,7 @@ format_sas_code <- function(field_list,output_dir_prefix){
 
   /* 导出为 CSV */
   PROC EXPORT DATA=merged_data  /* 要导出的数据集 */
-      OUTFILE='E:/rawdata/UKB_Data/data.csv'  /* 输出路径 */
+      OUTFILE='E:/rawdata/UKB_Data/UKB_data_20201126/{prefix}_data.csv'  /* 输出路径 */
       DBMS=CSV REPLACE;  /* 指定格式为 CSV，REPLACE 表示覆盖已有文件 */
   RUN;"
 
@@ -368,7 +372,8 @@ format_sas_code <- function(field_list,output_dir_prefix){
                      ukb_20201126 = paste(ukb_20201126, collapse = "\n  "),
                      ukb_20201222 = paste(ukb_20201222, collapse = "\n  "),
                      ukb_20211013 = paste(ukb_20211013, collapse = "\n  "),
-                     ukb_20220705 = paste(ukb_20220705, collapse = "\n  "), )
+                     ukb_20220705 = paste(ukb_20220705, collapse = "\n  "),
+                     prefix = sub(".*/", "", output_dir_prefix))
 
   # 输出为SAS文件
   writeLines(final_code, paste0(output_dir_prefix,".sas"))
