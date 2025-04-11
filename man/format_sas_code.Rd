@@ -4,10 +4,10 @@
 \alias{format_sas_code}
 \title{Title}
 \usage{
-format_sas_code(field_list, output_path)
+format_sas_code(field_list, output_dir_prefix)
 }
 \arguments{
-\item{output_path}{}
+\item{output_dir_prefix}{}
 }
 \description{
 Title
