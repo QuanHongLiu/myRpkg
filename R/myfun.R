@@ -32,7 +32,6 @@ extract_model_results_conf <- function(x, outcome, model, results) {
     results <- data.frame()
     results <- bind_rows(results, res)
   }
-
   # 返回结果
   return(results)
 }
