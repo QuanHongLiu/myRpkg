@@ -217,6 +217,10 @@ process_ukb_data <- function(data){
         return(data[[col_name]])
       } else if (var_type[[filed_id]] %in%  c("Integer", "Continuous")){
         return(as.numeric(data[[col_name]]))
+      } else if (var_type[[filed_id]] %in%  c("Date")){
+        return(as.Date(data[[col_name]],origin = "1960-01-01"))
+      } else if (var_type[[filed_id]] %in%  c("Time")){
+        return(as.POSIXct(data[[col_name]], origin="1960-01-01 00:00:00", tz="UTC"))
       } else {
         return(data[[col_name]])
       }
@@ -254,12 +258,6 @@ process_ukb_data <- function(data){
   })
   return(data)
 }
-# return(as.Date(data[[col_name]], origin = "1900-01-01"))
-# } else if(var_type[[filed_id]] %in%  c("Time")){
-#   print('--------------')
-#   return(as.POSIXct(data[[col_name]], origin="1970-01-01", tz="UTC"))
-
-
 
 
 #' Title
