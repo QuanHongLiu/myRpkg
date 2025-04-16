@@ -264,7 +264,7 @@ process_ukb_data <- function(data){
 format_sas_code <- function(field_list,output_dir_prefix){
   # 提取用户需要的 filed 的详细信息
   Dictionary_Showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Data_Dictionary_Showcase.csv"))
-  Dictionary_Showcase <- Dictionary_Showcase[Dictionary_Showcase$FieldID %in% field_list, c("FieldID","Field_zh","Field","Stability","ValueType","Units","Instances","Array","Notes_zh")]
+  Dictionary_Showcase <- Dictionary_Showcase[Dictionary_Showcase$FieldID %in% field_list, c("FieldID","Field","Field_zh","Notes_zh","ValueType","Units","Stability","Instances","Array")]
   write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,"_showcase.xlsx"))
 
 
