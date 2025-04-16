@@ -238,21 +238,14 @@ process_ukb_data <- function(data){
   )
 
   label(data) <- lapply(names(data), function(col_name) {
-    filed_id <-  strsplit(col_name, "_")[[1]][2]
-
-    if (filed_id %in% names(var_labels)) var_labels[[filed_id]] else ""
-  })
-
-  label(data) <- lapply(names(data), function(col_name) {
     filed_id <- strsplit(col_name, "_")[[1]][2]
 
     if (filed_id %in% names(var_labels)) {
-      var_labels[[filed_id]]  # 如果存在于var_labels中
-    } else if (filed_id == "eid") {   # 添加第一个else if条件
-      # 处理condition1为TRUE的情况
+      var_labels[[filed_id]]
+    } else if (filed_id == "eid") {
       "Encoded anonymised participant ID"
     } else {
-      ""  # 默认情况
+      attr(data[[col_name]],"label")
     }
   })
   return(data)
@@ -271,7 +264,7 @@ process_ukb_data <- function(data){
 format_sas_code <- function(field_list,output_dir_prefix){
   # 提取用户需要的 filed 的详细信息
   Dictionary_Showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Data_Dictionary_Showcase.csv"))
-  Dictionary_Showcase <- Dictionary_Showcase[Dictionary_Showcase$FieldID %in% field_list, c("FieldID","Field_zh","Field","Stability","ValueType","Units","Instances","Array","Notes")]
+  Dictionary_Showcase <- Dictionary_Showcase[Dictionary_Showcase$FieldID %in% field_list, c("FieldID","Field_zh","Field","Stability","ValueType","Units","Instances","Array","Notes_zh")]
   write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,"_showcase.xlsx"))
 
 
@@ -305,7 +298,7 @@ format_sas_code <- function(field_list,output_dir_prefix){
   # 生成提取数据的 SAS 代码
   print("正在生成提取数据的 SAS 代码")
   # 重复的变量
-  data_duplicated <- data_showcase[,c("UDI","Download_date")]
+  data_duplicated <- data_showcase[,c("UDI","Download_date","Count")]
   data_duplicated <- data_duplicated[!data_duplicated$UDI == "eid",]
   print("重复的变量包括如下：")
   data_duplicated <- data_duplicated[duplicated(data_duplicated$UDI) | duplicated(data_duplicated$UDI, fromLast = TRUE),]
