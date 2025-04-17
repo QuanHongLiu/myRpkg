@@ -186,6 +186,7 @@ write_xlsx <- function(
 
 
 
+
 #' Title
 #'
 #' @param data
@@ -216,10 +217,14 @@ process_ukb_data <- function(data){
         return(data[[col_name]])
       } else if (var_type[[filed_id]] %in%  c("Integer", "Continuous")){
         return(as.numeric(data[[col_name]]))
-      } else if (var_type[[filed_id]] %in%  c("Date")){
+      } else if (var_type[[filed_id]] %in%  c("Date") && grepl("^\\d+$", data[[col_name]][1])){
         return(as.Date(data[[col_name]],origin = "1960-01-01"))
-      } else if (var_type[[filed_id]] %in%  c("Time")){
+      } else if (var_type[[filed_id]] %in%  c("Date") && !grepl("^\\d+$", data[[col_name]][1])){
+        return(as.Date(data[[col_name]], format = "%d%b%Y"))
+      } else if (var_type[[filed_id]] %in%  c("Time") && grepl("^\\d+$", data[[col_name]][1])){
         return(as.POSIXct(data[[col_name]], origin="1960-01-01 00:00:00", tz="UTC"))
+      } else if (var_type[[filed_id]] %in%  c("Time") && !grepl("^\\d+$", data[[col_name]][1])){
+        return(as.POSIXct(data[[col_name]], format = "%d%b%Y %H:%M:%S"))
       } else {
         return(data[[col_name]])
       }
@@ -250,6 +255,9 @@ process_ukb_data <- function(data){
   })
   return(data)
 }
+
+
+
 
 
 #' Title
@@ -414,3 +422,141 @@ rename_ukb_data <- function(data, field_list) {
     }
   })
 }
+
+
+# 定义合并函数，自动去除前一个df中与新df重复的非键变量
+#' Title
+#'
+#' @param df1
+#' @param df2
+#' @param by
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+smart_merge <- function(df1, df2, by) {
+  # 找到除合并键以外的重复列
+  common_cols <- intersect(names(df1), names(df2))
+  common_cols <- setdiff(common_cols, by)
+
+  # 去掉 df1 中的重复列
+  df1 <- df1 %>% select(-all_of(common_cols))
+
+  # 合并
+  left_join(df1, df2, by = by)
+}
+
+
+
+
+
+
+
+#' Title
+#'
+#' @param field_list
+#' @param input_file_dir
+#' @param output_dir_prefix
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+extract_ukb_data <- function(field_list,input_file_dir,output_dir_prefix){
+  # 提取用户需要的 filed 的详细信息
+  Dictionary_Showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Data_Dictionary_Showcase.csv"))
+  Dictionary_Showcase <- Dictionary_Showcase[Dictionary_Showcase$FieldID %in% field_list, c("FieldID","Field","Field_zh","Notes_zh","ValueType","Units","Stability","Instances","Array")]
+
+  # 读取 UKB_variable_dictionary 文件
+  data_showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/UKB_variable_dictionary.csv"))
+  data_showcase <- data_showcase[!is.na(data_showcase$Start_pos),]
+
+
+  # 提取每个数据的 data showcase
+  ukb_20201126 <- data_showcase[data_showcase$Download_date == "2020-11-26", ]
+  ukb_20201222 <- data_showcase[data_showcase$Download_date == "2020-12-22", ]
+  ukb_20211013 <- data_showcase[data_showcase$Download_date == "2021-10-13", ]
+  ukb_20220705 <- data_showcase[data_showcase$Download_date == "2022-07-05", ]
+  ukb_20250412 <- data_showcase[data_showcase$Download_date == "2025-04-12", ]
+
+
+  # 把所需的挑出来
+  data_showcase <- data_showcase[sapply(strsplit(data_showcase$UDI, "-"), function(x) x[1]) %in% field_list,]
+
+  print(paste0("请求提取 ",length(field_list),"个变量"))
+  print(paste0("共有 ",sum(field_list %in% sapply(strsplit(data_showcase$UDI, "-"), function(x) x[1]))," 个变量在数据库中"))
+  missing_vars <- field_list[!field_list %in% sapply(strsplit(data_showcase$UDI, "-"), function(x) x[1])]
+  if (length(missing_vars) > 0) {
+    cat(paste0("数据库不包含变量：", paste(missing_vars, collapse = ", "), "\n"))
+  } else {
+    cat("所有变量均存在。\n")
+  }
+
+  # 重复的变量
+  data_duplicated <- data_showcase[,c("UDI","Download_date","Count")]
+  data_duplicated <- data_duplicated[!data_duplicated$UDI == "eid",]
+  print("重复的变量包括如下：")
+  data_duplicated <- data_duplicated[duplicated(data_duplicated$UDI) | duplicated(data_duplicated$UDI, fromLast = TRUE),]
+  print(data_duplicated[order(data_duplicated$UDI), ])
+  print("正在提取变量...")
+
+  # 提取每个项目的数据
+  laf1 <- laf_open_fwf(
+    filename = paste0(input_file_dir,"/UKB_Data/UKB_data_20201126/ukb44656.sd2"),
+    column_widths = ukb_20201126$Length,
+    column_types = rep("string", length(ukb_20201126$Length)),
+    column_names = ukb_20201126$Variable_name
+  )
+  df1 <- laf1[, ukb_20201126$Variable_name[sapply(strsplit(ukb_20201126$UDI, "-"),function(x) x[1]) %in% field_list]]
+
+  laf2 <- laf_open_fwf(
+    filename = paste0(input_file_dir,"/UKB_Data/UKB_data_20201222/ukb44921.sd2"),
+    column_widths = ukb_20201222$Length,
+    column_types = rep("string", length(ukb_20201222$Length)),
+    column_names = ukb_20201222$Variable_name
+  )
+  df2 <- laf2[, ukb_20201222$Variable_name[sapply(strsplit(ukb_20201222$UDI, "-"),function(x) x[1]) %in% field_list]]
+
+  laf3 <- laf_open_fwf(
+    filename = paste0(input_file_dir,"/UKB_Data/UKB_data_20211013/ukb48833.sd2"),
+    column_widths = ukb_20211013$Length,
+    column_types = rep("string", length(ukb_20211013$Length)),
+    column_names = ukb_20211013$Variable_name
+  )
+  df3 <- laf3[, ukb_20211013$Variable_name[sapply(strsplit(ukb_20211013$UDI, "-"),function(x) x[1]) %in% field_list]]
+
+  laf4 <- laf_open_fwf(
+    filename = paste0(input_file_dir,"/UKB_Data/UKB_data_20220705/ukb52673.sd2"),
+    column_widths = ukb_20220705$Length,
+    column_types = rep("string", length(ukb_20220705$Length)),
+    column_names = ukb_20220705$Variable_name
+  )
+  df4 <- laf4[, ukb_20220705$Variable_name[sapply(strsplit(ukb_20220705$UDI, "-"),function(x) x[1]) %in% field_list]]
+
+  laf5 <- laf_open_fwf(
+    filename = paste0(input_file_dir,"/UKB_Data/UKB_data_20250412/metabolism.sd2"),
+    column_widths = ukb_20250412$Length,
+    column_types = rep("string", length(ukb_20250412$Length)),
+    column_names = ukb_20250412$Variable_name
+  )
+  df5 <- laf5[, ukb_20250412$Variable_name[sapply(strsplit(ukb_20250412$UDI, "-"),function(x) x[1]) %in% field_list]]
+
+  # 合并数据
+  df_list <- list(df1, df2, df3, df4, df5)
+
+  # 示例合并，保留 df5 中的重复列
+  merged_df <- df1 %>%
+    smart_merge(df2, by = "n_eid") %>%
+    smart_merge(df3, by = "n_eid") %>%
+    smart_merge(df4, by = "n_eid") %>%
+    smart_merge(df5, by = "n_eid")
+
+  write_csv(merged_df,paste0(output_dir_prefix,".csv"))
+  write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,"_showcase.xlsx"))
+  return(merged_df)
+}
+
+
+
+
