@@ -383,3 +383,34 @@ format_sas_code <- function(field_list,output_dir_prefix){
 }
 
 
+
+
+
+
+#' Title
+#'
+#' @param data
+#' @param field_list
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+rename_ukb_data <- function(data, field_list) {
+  sapply(names(data), function(col_name) {
+    # 按下划线分割当前列名
+    x <- unlist(strsplit(col_name, "_"))
+
+    # 提取第二部分作为字段名（如果有）
+    key <- if (length(x) >= 2) x[2] else x[1]
+
+    # 查找 field_list 中对应的中文名
+    if (key %in% names(field_list) && field_list[[key]] != "") {
+      paste0(field_list[[key]],
+             ifelse(is.na(x[3]), "", x[3]),
+             ifelse(is.na(x[4]), "", x[4]))
+    } else {
+      col_name  # 找不到就返回原列名
+    }
+  })
+}
