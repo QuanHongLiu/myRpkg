@@ -15,6 +15,7 @@ Imports:
 Depends: 
     glue,
     Hmisc,
+    LaF,
     openxlsx,
     sjlabelled,
     tidyverse
