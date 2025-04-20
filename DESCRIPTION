@@ -17,5 +17,4 @@ Depends:
     Hmisc,
     LaF,
     openxlsx,
-    sjlabelled,
     tidyverse
