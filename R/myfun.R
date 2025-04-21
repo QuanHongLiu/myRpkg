@@ -204,28 +204,29 @@ process_ukb_data <- function(data){
   var_coding <- setNames(as.list(data_showcase$Coding), data_showcase$FieldID)
 
   data[] <- lapply(names(data), function(col_name) {
-    filed_id <-  strsplit(col_name, "_")[[1]][2]
-    if (filed_id %in% names(var_type)) {
-      if (var_type[[filed_id]] %in% c("Categorical multiple", "Categorical single")) {
+    field_id <-  strsplit(col_name, "_")[[1]][2]
+
+    if (field_id %in% names(var_type)) {
+      if (var_type[[field_id]] %in% c("Categorical multiple", "Categorical single")) {
         data[[col_name]] <- as.factor(data[[col_name]])
-        coding_map <- codings_showcase[codings_showcase$coding_id == var_coding[[filed_id]],]
+        coding_map <- codings_showcase[codings_showcase$coding_id == var_coding[[field_id]],]
         # 分类变量 label
         attr(data[[col_name]],"labels") <- setNames(coding_map$coding, coding_map$meaning)
         return(data[[col_name]])
-      } else if (var_type[[filed_id]] %in%  c("Integer", "Continuous")){
+      } else if (var_type[[field_id]] %in%  c("Integer", "Continuous")){
         return(as.numeric(data[[col_name]]))
-      } else if (var_type[[filed_id]] %in%  c("Date") && grepl("^\\d+$", data[[col_name]][1])){
+      } else if (var_type[[field_id]] %in%  c("Date") && grepl("^\\d+$", data[[col_name]][1])){
         return(as.Date(data[[col_name]],origin = "1960-01-01"))
-      } else if (var_type[[filed_id]] %in%  c("Date") && !grepl("^\\d+$", data[[col_name]][1])){
+      } else if (var_type[[field_id]] %in%  c("Date") && !grepl("^\\d+$", data[[col_name]][1])){
         return(as.Date(data[[col_name]], format = "%d%b%Y"))
-      } else if (var_type[[filed_id]] %in%  c("Time") && grepl("^\\d+$", data[[col_name]][1])){
+      } else if (var_type[[field_id]] %in%  c("Time") && grepl("^\\d+$", data[[col_name]][1])){
         return(as.POSIXct(data[[col_name]], origin="1960-01-01 00:00:00", tz="UTC"))
-      } else if (var_type[[filed_id]] %in%  c("Time") && !grepl("^\\d+$", data[[col_name]][1])){
+      } else if (var_type[[field_id]] %in%  c("Time") && !grepl("^\\d+$", data[[col_name]][1])){
         return(as.POSIXct(data[[col_name]], format = "%d%b%Y %H:%M:%S"))
       } else {
         return(data[[col_name]])
       }
-    } else if (filed_id == "eid"){
+    } else if (field_id %in% "eid"){
       return(as.numeric(data[[col_name]]))
     }
     return(data[[col_name]]) # 如果不满足条件，返回原列
@@ -240,12 +241,12 @@ process_ukb_data <- function(data){
   )
 
   data[] <- lapply(names(data), function(col_name) {
-    filed_id <- strsplit(col_name, "_")[[1]][2]
+    field_id <- strsplit(col_name, "_")[[1]][2]
 
-    if (filed_id %in% names(var_labels)) {
-      attr(data[[col_name]],"label") <- var_labels[[filed_id]]
+    if (field_id %in% names(var_labels)) {
+      attr(data[[col_name]],"label") <- var_labels[[field_id]]
       return(data[[col_name]])
-    } else if (filed_id == "eid") {
+    } else if (field_id %in% "eid") {
       attr(data[[col_name]],"label") <- "Encoded anonymised participant ID"
       return(data[[col_name]])
     } else {
@@ -270,31 +271,31 @@ process_ukb_data <- function(data){
 #   var_type <- setNames(as.list(data_showcase$ValueType), data_showcase$FieldID)
 #   var_coding <- setNames(as.list(data_showcase$Coding), data_showcase$FieldID)
 #   data[] <- lapply(names(data), function(col_name) {
-#     filed_id <-  strsplit(col_name, "_")[[1]][2]
-#     if (filed_id %in% names(var_type)) {
-#       if (var_type[[filed_id]] %in% c("Categorical multiple", "Categorical single")) {
+#     field_id <-  strsplit(col_name, "_")[[1]][2]
+#     if (field_id %in% names(var_type)) {
+#       if (var_type[[field_id]] %in% c("Categorical multiple", "Categorical single")) {
 #         data[[col_name]] <- as.factor(data[[col_name]])
-#         coding_map <- codings_showcase[codings_showcase$coding_id == var_coding[[filed_id]],]
+#         coding_map <- codings_showcase[codings_showcase$coding_id == var_coding[[field_id]],]
 #         # 分类变量 label
 #         data[[col_name]] <- set_labels(
 #           data[[col_name]],
 #           labels = setNames(coding_map$coding, coding_map$meaning)
 #         )
 #         return(data[[col_name]])
-#       } else if (var_type[[filed_id]] %in%  c("Integer", "Continuous")){
+#       } else if (var_type[[field_id]] %in%  c("Integer", "Continuous")){
 #         return(as.numeric(data[[col_name]]))
-#       } else if (var_type[[filed_id]] %in%  c("Date") && grepl("^\\d+$", data[[col_name]][1])){
+#       } else if (var_type[[field_id]] %in%  c("Date") && grepl("^\\d+$", data[[col_name]][1])){
 #         return(as.Date(data[[col_name]],origin = "1960-01-01"))
-#       } else if (var_type[[filed_id]] %in%  c("Date") && !grepl("^\\d+$", data[[col_name]][1])){
+#       } else if (var_type[[field_id]] %in%  c("Date") && !grepl("^\\d+$", data[[col_name]][1])){
 #         return(as.Date(data[[col_name]], format = "%d%b%Y"))
-#       } else if (var_type[[filed_id]] %in%  c("Time") && grepl("^\\d+$", data[[col_name]][1])){
+#       } else if (var_type[[field_id]] %in%  c("Time") && grepl("^\\d+$", data[[col_name]][1])){
 #         return(as.POSIXct(data[[col_name]], origin="1960-01-01 00:00:00", tz="UTC"))
-#       } else if (var_type[[filed_id]] %in%  c("Time") && !grepl("^\\d+$", data[[col_name]][1])){
+#       } else if (var_type[[field_id]] %in%  c("Time") && !grepl("^\\d+$", data[[col_name]][1])){
 #         return(as.POSIXct(data[[col_name]], format = "%d%b%Y %H:%M:%S"))
 #       } else {
 #         return(data[[col_name]])
 #       }
-#     } else if (filed_id == "eid"){
+#     } else if (field_id == "eid"){
 #       return(as.numeric(data[[col_name]]))
 #     }
 #     return(data[[col_name]]) # 如果不满足条件，返回原列
@@ -309,11 +310,11 @@ process_ukb_data <- function(data){
 #   )
 #
 #   label(data) <- lapply(names(data), function(col_name) {
-#     filed_id <- strsplit(col_name, "_")[[1]][2]
+#     field_id <- strsplit(col_name, "_")[[1]][2]
 #
-#     if (filed_id %in% names(var_labels)) {
-#       var_labels[[filed_id]]
-#     } else if (filed_id == "eid") {
+#     if (field_id %in% names(var_labels)) {
+#       var_labels[[field_id]]
+#     } else if (field_id == "eid") {
 #       "Encoded anonymised participant ID"
 #     } else {
 #       attr(data[[col_name]],"label")
