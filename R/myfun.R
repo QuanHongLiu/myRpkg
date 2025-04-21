@@ -205,7 +205,6 @@ process_ukb_data <- function(data){
 
   data[] <- lapply(names(data), function(col_name) {
     field_id <-  strsplit(col_name, "_")[[1]][2]
-
     if (field_id %in% names(var_type)) {
       if (var_type[[field_id]] %in% c("Categorical multiple", "Categorical single")) {
         data[[col_name]] <- as.factor(data[[col_name]])
@@ -254,7 +253,6 @@ process_ukb_data <- function(data){
       return(data[[col_name]])
     }
   })
-
   return(data)
 }
 
