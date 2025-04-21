@@ -617,9 +617,15 @@ extract_ukb_data <- function(field_list,input_file_dir,output_dir_prefix){
     smart_merge(df4, by = "n_eid") %>%
     smart_merge(df5, by = "n_eid")
 
-  write_csv(merged_df,paste0(output_dir_prefix,".csv"))
-  write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,"_showcase.xlsx"))
-  return(merged_df)
+  # 如果 output_dir_prefix 为 NA 则不输出，只加载数据
+  if (!missing(output_dir_prefix)) {
+    write_csv(merged_df,paste0(output_dir_prefix,".csv"))
+    write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,"_showcase.xlsx"))
+    return(merged_df)
+  } else {
+    merged_df[merged_df == ""] <- NA
+    return(merged_df)
+  }
 }
 
 
