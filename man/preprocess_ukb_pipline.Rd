@@ -7,7 +7,7 @@
 preprocess_ukb_pipline(
   input_vec,
   ukb_data_dir = "~/rawdata/",
-  output_dir_prefix
+  output_dir_prefix = ""
 )
 }
 \arguments{

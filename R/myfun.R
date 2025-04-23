@@ -645,6 +645,7 @@ generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_
 #' @examples
 preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_dir_prefix="") {
   # 用户提供field list，找到filed——list和代码
+  print(search())
   print("step1 generate_fieldids_code")
   print(Sys.time())
   res <- generate_fieldids_code(input_vec = input_vec,
@@ -666,7 +667,7 @@ preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_di
   # 返回 数据框
   print("step4 pasrse")
   print(Sys.time())
-  eval(parse(text = res$code))
+  eval(parse(text = sub("\\.R\"\\)", ".R\", local = TRUE)", res$code)))
   return(all)
 }
 
