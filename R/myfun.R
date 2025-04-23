@@ -709,10 +709,10 @@ preprocess_ukb_pipline <- function(input_vec,out_data_dir_prefix,output_code_dir
   res <- generate_fieldids_code(input_vec,output_dir_prefix = output_code_dir_prefix)
 
   # 利用代码提取到环境中（提取后是否保存rawdata）
-  data <- extract_ukb_data(res$field_list,output_dir_prefix = out_data_dir_prefix)
+  all <- extract_ukb_data(res$field_list,output_dir_prefix = out_data_dir_prefix)
 
   # 处理数据
-  data <- process_ukb_data(data = data)
+  all <- process_ukb_data(data = all)
 
   # 返回 数据框
   eval(parse(text = res$code))
