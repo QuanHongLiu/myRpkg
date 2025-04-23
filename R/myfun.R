@@ -631,3 +631,57 @@ extract_ukb_data <- function(field_list,input_file_dir,output_dir_prefix){
 
 
 
+
+
+#' Title
+#'
+#' @param input_vec
+#' @param dir_path
+#' @param output_dir_prefix
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+generate_field_ids <- function(input_vec, dir_path="~/rawdata/UKB_Data/vars/", output_dir_prefix) {
+  # 获取所有非.R文件路径（递归搜索）
+  file_list <- dir(dir_path, pattern = "[^.R]$")
+  var_names <- sapply(strsplit(file_list, "\\."), function(x) x[3])
+  file_var <- setNames(as.list(file_list), var_names)
+
+  # 变量和 fieldid的列表
+  var_field_list <- list()
+
+  for (element in input_vec) {
+    vars <- var_names[grepl(element, var_names)]   # 0或多个
+    if (length(vars) == 0) {
+      var_field_list[element] <- list(NULL)
+      next  # 继续下一个 element
+    }
+
+    for (var in vars) {
+      var_field_list[[var]] <- readLines(paste0(dir_path,file_var[var]))
+    }
+  }
+
+  # 初始化结果
+  field_list <- c()
+  output_str <- ""
+  for (var in names(var_field_list)) {
+    val <- var_field_list[[var]]
+    if (is.null(val)) {
+      field_list <- c(field_list, var)
+    } else {
+      field_list <- c(field_list, val)
+      # 将var对应的文件第一行输出到一个字符里保存
+      output_str <- paste0(output_str,readLines(paste0(dir_path,file_var[[var]],".R"), n = 1), "\n")
+      output_str <- paste0(output_str,"source(","\"",dir_path,file_var[[var]],".R","\"",")", "\n","\n")
+    }
+  }
+
+  # 导出结果
+  writeLines(output_str, paste0(output_dir_prefix,".R"))
+  return(field_list)
+}
+
+
