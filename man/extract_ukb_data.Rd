@@ -4,7 +4,7 @@
 \alias{extract_ukb_data}
 \title{Title}
 \usage{
-extract_ukb_data(field_list, input_file_dir = "~/rawdata/", output_dir_prefix)
+extract_ukb_data(field_list, ukb_data_dir = "~/rawdata/", output_dir_prefix)
 }
 \arguments{
 \item{output_dir_prefix}{}

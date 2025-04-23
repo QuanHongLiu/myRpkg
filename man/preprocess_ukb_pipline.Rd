@@ -4,10 +4,10 @@
 \alias{preprocess_ukb_pipline}
 \title{Title}
 \usage{
-preprocess_ukb_pipline(input_vec, out_data_dir_prefix, output_code_dir_prefix)
+preprocess_ukb_pipline(input_vec, ukb_data_dir, output_dir_prefix)
 }
 \arguments{
-\item{output_code_dir_prefix}{}
+\item{output_dir_prefix}{}
 }
 \description{
 Title

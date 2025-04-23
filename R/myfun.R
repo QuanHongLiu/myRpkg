@@ -259,72 +259,6 @@ process_ukb_data <- function(data){
 
 
 
-
-# process_ukb_data <- function(data){
-#   # 0. 读取 data_showcase 文件
-#   data_showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Data_Dictionary_Showcase.csv"))
-#   # 1. 读取 codings_showcase 文件
-#   codings_showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Codings_Showcase.csv"))
-#   # 2. 更改变量类型
-#   var_type <- setNames(as.list(data_showcase$ValueType), data_showcase$FieldID)
-#   var_coding <- setNames(as.list(data_showcase$Coding), data_showcase$FieldID)
-#   data[] <- lapply(names(data), function(col_name) {
-#     field_id <-  strsplit(col_name, "_")[[1]][2]
-#     if (field_id %in% names(var_type)) {
-#       if (var_type[[field_id]] %in% c("Categorical multiple", "Categorical single")) {
-#         data[[col_name]] <- as.factor(data[[col_name]])
-#         coding_map <- codings_showcase[codings_showcase$coding_id == var_coding[[field_id]],]
-#         # 分类变量 label
-#         data[[col_name]] <- set_labels(
-#           data[[col_name]],
-#           labels = setNames(coding_map$coding, coding_map$meaning)
-#         )
-#         return(data[[col_name]])
-#       } else if (var_type[[field_id]] %in%  c("Integer", "Continuous")){
-#         return(as.numeric(data[[col_name]]))
-#       } else if (var_type[[field_id]] %in%  c("Date") && grepl("^\\d+$", data[[col_name]][1])){
-#         return(as.Date(data[[col_name]],origin = "1960-01-01"))
-#       } else if (var_type[[field_id]] %in%  c("Date") && !grepl("^\\d+$", data[[col_name]][1])){
-#         return(as.Date(data[[col_name]], format = "%d%b%Y"))
-#       } else if (var_type[[field_id]] %in%  c("Time") && grepl("^\\d+$", data[[col_name]][1])){
-#         return(as.POSIXct(data[[col_name]], origin="1960-01-01 00:00:00", tz="UTC"))
-#       } else if (var_type[[field_id]] %in%  c("Time") && !grepl("^\\d+$", data[[col_name]][1])){
-#         return(as.POSIXct(data[[col_name]], format = "%d%b%Y %H:%M:%S"))
-#       } else {
-#         return(data[[col_name]])
-#       }
-#     } else if (field_id == "eid"){
-#       return(as.numeric(data[[col_name]]))
-#     }
-#     return(data[[col_name]]) # 如果不满足条件，返回原列
-#   })
-#
-#   # 2. 添加变量标签（精确匹配）
-#   var_labels <- setNames(
-#     as.list(paste0(data_showcase$Field,
-#                    ifelse(is.na(data_showcase$Units), "",
-#                           paste0(", ", data_showcase$Units)))),
-#     data_showcase$FieldID
-#   )
-#
-#   label(data) <- lapply(names(data), function(col_name) {
-#     field_id <- strsplit(col_name, "_")[[1]][2]
-#
-#     if (field_id %in% names(var_labels)) {
-#       var_labels[[field_id]]
-#     } else if (field_id == "eid") {
-#       "Encoded anonymised participant ID"
-#     } else {
-#       attr(data[[col_name]],"label")
-#     }
-#   })
-#   return(data)
-# }
-
-
-
-
-
 #' Title
 #'
 #' @param field_list
@@ -518,17 +452,19 @@ smart_merge <- function(df1, df2, by) {
 
 
 
+
+
 #' Title
 #'
 #' @param field_list
-#' @param input_file_dir
+#' @param ukb_data_dir
 #' @param output_dir_prefix
 #'
 #' @returns
 #' @export
 #'
 #' @examples
-extract_ukb_data <- function(field_list,input_file_dir="~/rawdata/",output_dir_prefix){
+extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_prefix){
   # 提取用户需要的 filed 的详细信息
   Dictionary_Showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Data_Dictionary_Showcase.csv"))
   Dictionary_Showcase <- Dictionary_Showcase[Dictionary_Showcase$FieldID %in% field_list, c("FieldID","Field","Field_zh","Notes_zh","ValueType","Units","Stability","Instances","Array")]
@@ -568,7 +504,7 @@ extract_ukb_data <- function(field_list,input_file_dir="~/rawdata/",output_dir_p
 
   # 提取每个项目的数据
   laf1 <- laf_open_fwf(
-    filename = paste0(input_file_dir,"/UKB_Data/UKB_data_20201126/ukb44656.sd2"),
+    filename = paste0(ukb_data_dir,"/UKB_Data/UKB_data_20201126/ukb44656.sd2"),
     column_widths = ukb_20201126$Length,
     column_types = rep("string", length(ukb_20201126$Length)),
     column_names = ukb_20201126$Variable_name
@@ -576,7 +512,7 @@ extract_ukb_data <- function(field_list,input_file_dir="~/rawdata/",output_dir_p
   df1 <- laf1[, ukb_20201126$Variable_name[sapply(strsplit(ukb_20201126$UDI, "-"),function(x) x[1]) %in% field_list]]
 
   laf2 <- laf_open_fwf(
-    filename = paste0(input_file_dir,"/UKB_Data/UKB_data_20201222/ukb44921.sd2"),
+    filename = paste0(ukb_data_dir,"/UKB_Data/UKB_data_20201222/ukb44921.sd2"),
     column_widths = ukb_20201222$Length,
     column_types = rep("string", length(ukb_20201222$Length)),
     column_names = ukb_20201222$Variable_name
@@ -584,7 +520,7 @@ extract_ukb_data <- function(field_list,input_file_dir="~/rawdata/",output_dir_p
   df2 <- laf2[, ukb_20201222$Variable_name[sapply(strsplit(ukb_20201222$UDI, "-"),function(x) x[1]) %in% field_list]]
 
   laf3 <- laf_open_fwf(
-    filename = paste0(input_file_dir,"/UKB_Data/UKB_data_20211013/ukb48833.sd2"),
+    filename = paste0(ukb_data_dir,"/UKB_Data/UKB_data_20211013/ukb48833.sd2"),
     column_widths = ukb_20211013$Length,
     column_types = rep("string", length(ukb_20211013$Length)),
     column_names = ukb_20211013$Variable_name
@@ -592,7 +528,7 @@ extract_ukb_data <- function(field_list,input_file_dir="~/rawdata/",output_dir_p
   df3 <- laf3[, ukb_20211013$Variable_name[sapply(strsplit(ukb_20211013$UDI, "-"),function(x) x[1]) %in% field_list]]
 
   laf4 <- laf_open_fwf(
-    filename = paste0(input_file_dir,"/UKB_Data/UKB_data_20220705/ukb52673.sd2"),
+    filename = paste0(ukb_data_dir,"/UKB_Data/UKB_data_20220705/ukb52673.sd2"),
     column_widths = ukb_20220705$Length,
     column_types = rep("string", length(ukb_20220705$Length)),
     column_names = ukb_20220705$Variable_name
@@ -600,7 +536,7 @@ extract_ukb_data <- function(field_list,input_file_dir="~/rawdata/",output_dir_p
   df4 <- laf4[, ukb_20220705$Variable_name[sapply(strsplit(ukb_20220705$UDI, "-"),function(x) x[1]) %in% field_list]]
 
   laf5 <- laf_open_fwf(
-    filename = paste0(input_file_dir,"/UKB_Data/UKB_data_20250412/metabolism.sd2"),
+    filename = paste0(ukb_data_dir,"/UKB_Data/UKB_data_20250412/metabolism.sd2"),
     column_widths = ukb_20250412$Length,
     column_types = rep("string", length(ukb_20250412$Length)),
     column_names = ukb_20250412$Variable_name
@@ -618,7 +554,7 @@ extract_ukb_data <- function(field_list,input_file_dir="~/rawdata/",output_dir_p
     smart_merge(df5, by = "n_eid")
 
   # 如果 output_dir_prefix 为 NA 则不输出，只加载数据
-  if (!missing(output_dir_prefix)) {
+  if (!missing(output_dir_prefix) & nchar(output_dir_prefix) > 0) {
     write_csv(merged_df,paste0(output_dir_prefix,".csv"))
     write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,"_showcase.xlsx"))
     return(merged_df)
@@ -633,18 +569,20 @@ extract_ukb_data <- function(field_list,input_file_dir="~/rawdata/",output_dir_p
 
 
 
+
 #' Title
 #'
 #' @param input_vec
-#' @param dir_path
+#' @param ukb_data_dir
 #' @param output_dir_prefix
 #'
 #' @returns
 #' @export
 #'
 #' @examples
-generate_fieldids_code <- function(input_vec, dir_path="~/rawdata/UKB_Data/vars/", output_dir_prefix) {
+generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_dir_prefix) {
   # 获取所有非.R文件路径（递归搜索）
+  dir_path <- paste0(ukb_data_dir,"/UKB_Data/vars/")
   file_list <- dir(dir_path, pattern = "[^.R]$")
   var_names <- sapply(strsplit(file_list, "\\."), function(x) x[3])
   file_var <- setNames(as.list(file_list), var_names)
@@ -680,7 +618,7 @@ generate_fieldids_code <- function(input_vec, dir_path="~/rawdata/UKB_Data/vars/
   }
 
   # 如果有 output_dir_prefix ，则输出文件
-  if (!missing(output_dir_prefix)) {
+  if (!missing(output_dir_prefix) & nchar(output_dir_prefix) > 0) {
     writeLines(output_str, paste0(output_dir_prefix,".R"))
   }
 
@@ -697,23 +635,30 @@ generate_fieldids_code <- function(input_vec, dir_path="~/rawdata/UKB_Data/vars/
 #' Title
 #'
 #' @param input_vec
-#' @param out_data_dir_prefix
-#' @param output_code_dir_prefix
+#' @param ukb_data_dir
+#' @param output_dir_prefix
 #'
 #' @returns
 #' @export
 #'
 #' @examples
-preprocess_ukb_pipline <- function(input_vec,out_data_dir_prefix,output_code_dir_prefix) {
+preprocess_ukb_pipline <- function(input_vec,ukb_data_dir,output_dir_prefix) {
+  # 加载所需的包
+  library(dplyr)
+
   # 用户提供field list，找到filed——list和代码
   print("step1 generate_fieldids_code")
   print(Sys.time())
-  res <- generate_fieldids_code(input_vec,output_dir_prefix = output_code_dir_prefix)
+  res <- generate_fieldids_code(input_vec = input_vec,
+                                ukb_data_dir = ukb_data_dir,
+                                output_dir_prefix = output_code_dir_prefix)
 
   # 利用代码提取到环境中（提取后是否保存rawdata）
   print("step2 extract_ukb_data")
   print(Sys.time())
-  all <- extract_ukb_data(res$field_list,output_dir_prefix = out_data_dir_prefix)
+  all <- extract_ukb_data(res$field_list,
+                          ukb_data_dir = ukb_data_dir,
+                          output_dir_prefix = output_dir_prefix)
 
   # 处理数据
   print("step3 process_ukb_data")

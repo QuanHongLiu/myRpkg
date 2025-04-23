@@ -6,7 +6,7 @@
 \usage{
 generate_fieldids_code(
   input_vec,
-  dir_path = "~/rawdata/UKB_Data/vars/",
+  ukb_data_dir = "~/rawdata/",
   output_dir_prefix
 )
 }
