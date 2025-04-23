@@ -4,7 +4,11 @@
 \alias{preprocess_ukb_pipline}
 \title{Title}
 \usage{
-preprocess_ukb_pipline(input_vec, ukb_data_dir, output_dir_prefix)
+preprocess_ukb_pipline(
+  input_vec,
+  ukb_data_dir = "~/rawdata/",
+  output_dir_prefix
+)
 }
 \arguments{
 \item{output_dir_prefix}{}

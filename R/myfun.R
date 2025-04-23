@@ -632,6 +632,7 @@ generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_
 
 
 
+
 #' Title
 #'
 #' @param input_vec
@@ -642,7 +643,7 @@ generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_
 #' @export
 #'
 #' @examples
-preprocess_ukb_pipline <- function(input_vec,ukb_data_dir,output_dir_prefix) {
+preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_dir_prefix) {
   # 加载所需的包
   library(dplyr)
 
@@ -651,7 +652,7 @@ preprocess_ukb_pipline <- function(input_vec,ukb_data_dir,output_dir_prefix) {
   print(Sys.time())
   res <- generate_fieldids_code(input_vec = input_vec,
                                 ukb_data_dir = ukb_data_dir,
-                                output_dir_prefix = output_code_dir_prefix)
+                                output_dir_prefix = output_dir_prefix)
 
   # 利用代码提取到环境中（提取后是否保存rawdata）
   print("step2 extract_ukb_data")
