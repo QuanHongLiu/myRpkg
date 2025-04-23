@@ -644,9 +644,6 @@ generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_
 #'
 #' @examples
 preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_dir_prefix="") {
-  # 加载所需的包
-  library(dplyr)
-
   # 用户提供field list，找到filed——list和代码
   print("step1 generate_fieldids_code")
   print(Sys.time())
