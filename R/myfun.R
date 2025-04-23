@@ -667,7 +667,7 @@ preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_di
   # 返回 数据框
   print("step4 pasrse")
   print(Sys.time())
-  eval(parse(text = sub("\\.R\"\\)", ".R\", local = TRUE)", res$code)))
+  eval(parse(text = gsub("\\.R\"\\)", ".R\", local = TRUE)", res$code)))
   return(all)
 }
 
