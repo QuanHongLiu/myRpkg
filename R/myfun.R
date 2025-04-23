@@ -706,15 +706,28 @@ generate_fieldids_code <- function(input_vec, dir_path="~/rawdata/UKB_Data/vars/
 #' @examples
 preprocess_ukb_pipline <- function(input_vec,out_data_dir_prefix,output_code_dir_prefix) {
   # 用户提供field list，找到filed——list和代码
+  print("step1 generate_fieldids_code")
+  print(Sys.time())
   res <- generate_fieldids_code(input_vec,output_dir_prefix = output_code_dir_prefix)
 
   # 利用代码提取到环境中（提取后是否保存rawdata）
+  print("step2 extract_ukb_data")
+  print(Sys.time())
   all <- extract_ukb_data(res$field_list,output_dir_prefix = out_data_dir_prefix)
 
   # 处理数据
+  print("step3 process_ukb_data")
+  print(Sys.time())
   all <- process_ukb_data(data = all)
 
   # 返回 数据框
+  print("step4 pasrse")
+  print(Sys.time())
   eval(parse(text = res$code))
   return(all)
 }
+
+
+
+
+
