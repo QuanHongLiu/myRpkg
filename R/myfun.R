@@ -643,7 +643,7 @@ generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_
 #' @export
 #'
 #' @examples
-preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_dir_prefix) {
+preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_dir_prefix="") {
   # 加载所需的包
   library(dplyr)
 
