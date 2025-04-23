@@ -716,5 +716,5 @@ preprocess_ukb_pipline <- function(input_vec,out_data_dir_prefix,output_code_dir
 
   # 返回 数据框
   eval(parse(text = res$code))
-  return(data)
+  return(all)
 }
