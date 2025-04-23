@@ -689,3 +689,32 @@ generate_fieldids_code <- function(input_vec, dir_path="~/rawdata/UKB_Data/vars/
 }
 
 
+
+
+
+
+
+#' Title
+#'
+#' @param input_vec
+#' @param out_data_dir_prefix
+#' @param output_code_dir_prefix
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+preprocess_ukb_pipline <- function(input_vec,out_data_dir_prefix,output_code_dir_prefix) {
+  # 用户提供field list，找到filed——list和代码
+  res <- generate_fieldids_code(input_vec,output_dir_prefix = output_code_dir_prefix)
+
+  # 利用代码提取到环境中（提取后是否保存rawdata）
+  data <- extract_ukb_data(res$field_list,output_dir_prefix = out_data_dir_prefix)
+
+  # 处理数据
+  data <- process_ukb_data(data = data)
+
+  # 返回 数据框
+  eval(parse(text = res$code))
+  return(data)
+}
