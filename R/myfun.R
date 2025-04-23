@@ -528,7 +528,7 @@ smart_merge <- function(df1, df2, by) {
 #' @export
 #'
 #' @examples
-extract_ukb_data <- function(field_list,input_file_dir,output_dir_prefix){
+extract_ukb_data <- function(field_list,input_file_dir="~/rawdata/",output_dir_prefix){
   # 提取用户需要的 filed 的详细信息
   Dictionary_Showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Data_Dictionary_Showcase.csv"))
   Dictionary_Showcase <- Dictionary_Showcase[Dictionary_Showcase$FieldID %in% field_list, c("FieldID","Field","Field_zh","Notes_zh","ValueType","Units","Stability","Instances","Array")]
@@ -643,7 +643,7 @@ extract_ukb_data <- function(field_list,input_file_dir,output_dir_prefix){
 #' @export
 #'
 #' @examples
-generate_field_ids <- function(input_vec, dir_path="~/rawdata/UKB_Data/vars/", output_dir_prefix) {
+generate_fieldids_code <- function(input_vec, dir_path="~/rawdata/UKB_Data/vars/", output_dir_prefix) {
   # 获取所有非.R文件路径（递归搜索）
   file_list <- dir(dir_path, pattern = "[^.R]$")
   var_names <- sapply(strsplit(file_list, "\\."), function(x) x[3])
@@ -679,9 +679,13 @@ generate_field_ids <- function(input_vec, dir_path="~/rawdata/UKB_Data/vars/", o
     }
   }
 
+  # 如果有 output_dir_prefix ，则输出文件
+  if (!missing(output_dir_prefix)) {
+    writeLines(output_str, paste0(output_dir_prefix,".R"))
+  }
+
   # 导出结果
-  writeLines(output_str, paste0(output_dir_prefix,".R"))
-  return(field_list)
+  return(list(field_list = field_list, code = output_str))
 }
 
 
