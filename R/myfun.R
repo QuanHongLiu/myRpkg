@@ -597,6 +597,9 @@ extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_pre
 #'
 #' @examples
 generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_dir_prefix="") {
+  # 用户可不传入 eid
+  input_vec <- c("eid",input_vec)
+
   # 获取所有非.R文件路径（递归搜索）
   dir_path <- paste0(ukb_data_dir,"/UKB_Data/vars/")
   file_list <- dir(dir_path, pattern = "[^.R]$")
@@ -627,17 +630,24 @@ generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_
       field_list <- c(field_list, var)
     } else {
       field_list <- c(field_list, val)
-      # 将var对应的文件第一行输出到一个字符里保存
-      output_str <- paste0(output_str,readLines(paste0(dir_path,file_var[[var]],".R"), n = 1), "\n")
-      output_str <- paste0(output_str,"source(","\"",dir_path,file_var[[var]],".R","\"",")", "\n","\n")
+      # 判断是否保存
+      if (!missing(output_dir_prefix) & nchar(output_dir_prefix) > 0){
+        # 并且有这么一个代码文件
+        if (file.exists(paste0(output_dir_prefix,".R"))) {
+          output_str <- readChar(paste0(output_dir_prefix,".R"), file.info(paste0(output_dir_prefix,".R"))$size)
+        }
+        # 将var对应的文件第一行输出到一个字符里保存
+        output_str <- paste0(output_str,readLines(paste0(dir_path,file_var[[var]],".R"), n = 1), "\n")
+        output_str <- paste0(output_str,"source(","\"",dir_path,file_var[[var]],".R","\"",")")
+        writeLines(output_str, paste0(output_dir_prefix,".R"))   # 写入
+        writeLines(unique(readLines(paste0(output_dir_prefix,".R"))), paste0(output_dir_prefix,".R"))   # 读取去重后输出
+        output_str <- readChar(paste0(output_dir_prefix,".R"), file.info(paste0(output_dir_prefix,".R"))$size)  # 输出
+      } else {
+        output_str <- paste0(output_str,readLines(paste0(dir_path,file_var[[var]],".R"), n = 1), "\n")
+        output_str <- paste0(output_str,"source(","\"",dir_path,file_var[[var]],".R","\"",")", "\n")
+      }
     }
   }
-
-  # 如果有 output_dir_prefix ，则输出文件
-  if (!missing(output_dir_prefix) & nchar(output_dir_prefix) > 0) {
-    writeLines(output_str, paste0(output_dir_prefix,".R"))
-  }
-
   # 导出结果
   return(list(field_list = field_list, code = output_str))
 }
