@@ -443,7 +443,7 @@ smart_merge <- function(df1, df2, by) {
   df1 <- df1 %>% select(-all_of(common_cols))
 
   # 合并
-  left_join(df1, df2, by = by)
+  full_join(df1, df2, by = by)
 }
 
 
@@ -465,6 +465,9 @@ smart_merge <- function(df1, df2, by) {
 #'
 #' @examples
 extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_prefix){
+  # 用户不输入"eid"也可以
+  field_list <- c("eid",field_list)
+
   # 提取用户需要的 filed 的详细信息
   Dictionary_Showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Data_Dictionary_Showcase.csv"))
   Dictionary_Showcase <- Dictionary_Showcase[Dictionary_Showcase$FieldID %in% field_list, c("FieldID","Field","Field_zh","Notes_zh","ValueType","Units","Stability","Instances","Array")]
@@ -555,15 +558,27 @@ extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_pre
 
   # 如果 output_dir_prefix 为 NA 则不输出，只加载数据
   if (!missing(output_dir_prefix) & nchar(output_dir_prefix) > 0) {
-    write_csv(merged_df,paste0(output_dir_prefix,".csv"))
-    write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,"_showcase.xlsx"))
-    return(merged_df)
+    if (file.exists(paste0(output_dir_prefix,".csv"))) {
+      # 合并文件
+      library(data.table)
+      data_orig <- fread(paste0(output_dir_prefix,".csv"), colClasses = "character")
+      merged_df <- data_orig %>% smart_merge(merged_df, by = "n_eid")
+      # 合并xlsx
+      library(readxl)
+      showcase_orig <- read_excel("UKB/P1_QC/data/rawdata/disease_inf_showcase.xlsx")
+      showcase_orig <- bind_rows(showcase_orig, Dictionary_Showcase) %>% arrange(FieldID)
+      # 输出
+      return(merged_df)
+    } else {
+      write_csv(merged_df,paste0(output_dir_prefix,".csv"))
+      write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,"_showcase.xlsx"))
+      return(merged_df)
+    }
   } else {
     merged_df[merged_df == ""] <- NA
     return(merged_df)
   }
 }
-
 
 
 
@@ -670,8 +685,3 @@ preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_di
   eval(parse(text = gsub("\\.R\"\\)", ".R\", local = TRUE)", res$code)))
   return(all)
 }
-
-
-
-
-
