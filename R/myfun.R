@@ -451,9 +451,6 @@ smart_merge <- function(df1, df2, by) {
 
 
 
-
-
-
 #' Title
 #'
 #' @param field_list
@@ -464,7 +461,7 @@ smart_merge <- function(df1, df2, by) {
 #' @export
 #'
 #' @examples
-extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_prefix){
+extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_prefix=""){
   # 用户不输入"eid"也可以
   field_list <- c("eid",field_list)
 
@@ -559,19 +556,25 @@ extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_pre
   # 如果 output_dir_prefix 为 NA 则不输出，只加载数据
   if (!missing(output_dir_prefix) & nchar(output_dir_prefix) > 0) {
     if (file.exists(paste0(output_dir_prefix,".csv"))) {
-      # 合并文件
+      # 合并（完全合并）去重（去掉前面的变量）
       library(data.table)
       data_orig <- fread(paste0(output_dir_prefix,".csv"), colClasses = "character")
       merged_df <- data_orig %>% smart_merge(merged_df, by = "n_eid")
       # 合并xlsx
       library(readxl)
-      showcase_orig <- read_excel("UKB/P1_QC/data/rawdata/disease_inf_showcase.xlsx")
-      showcase_orig <- bind_rows(showcase_orig, Dictionary_Showcase) %>% arrange(FieldID)
+      showcase_orig <- read_excel(paste0(output_dir_prefix, "_showcase.xlsx"))
+      Dictionary_Showcase <- bind_rows(showcase_orig, Dictionary_Showcase) %>%
+        distinct(FieldID, .keep_all = TRUE) %>%  # 按 FieldID 去重，保留所有列
+        arrange(FieldID)
+      write_csv(merged_df,paste0(output_dir_prefix,".csv"))
+      write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,"_showcase.xlsx"))
       # 输出
+      merged_df[merged_df == ""] <- NA
       return(merged_df)
     } else {
       write_csv(merged_df,paste0(output_dir_prefix,".csv"))
       write_xlsx(x = Dictionary_Showcase, file = paste0(output_dir_prefix,"_showcase.xlsx"))
+      merged_df[merged_df == ""] <- NA
       return(merged_df)
     }
   } else {
@@ -579,8 +582,6 @@ extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_pre
     return(merged_df)
   }
 }
-
-
 
 
 
@@ -595,7 +596,7 @@ extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_pre
 #' @export
 #'
 #' @examples
-generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_dir_prefix) {
+generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_dir_prefix="") {
   # 获取所有非.R文件路径（递归搜索）
   dir_path <- paste0(ukb_data_dir,"/UKB_Data/vars/")
   file_list <- dir(dir_path, pattern = "[^.R]$")
