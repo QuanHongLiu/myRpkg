@@ -656,9 +656,6 @@ generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_
 
 
 
-
-
-
 #' Title
 #'
 #' @param input_vec
@@ -695,4 +692,73 @@ preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_di
   print(Sys.time())
   eval(parse(text = gsub("\\.R\"\\)", ".R\", local = TRUE)", res$code)))
   return(all)
+}
+
+
+
+
+
+
+# x 数值向量（需处理的数据列）
+# 离群值定义方法："quantile"（分位数）、"fixed"（固定阈值）或 "iqr"（三倍IQR）
+# 处理动作："cap"（封顶，默认）或 "na"（替换为NA）
+# lower 下限值（分位数法时为下分位数，固定阈值法时为下限值，IQR法时不使用）
+# upper 上限值（分位数法时为上分位数，固定阈值法时为上限值，IQR法时不使用）
+# k IQR法的倍数（默认3）
+# na.rm 是否忽略缺失值（默认TRUE）
+
+
+#' Title
+#'
+#' @param x
+#' @param method
+#' @param action
+#' @param lower
+#' @param upper
+#' @param k
+#' @param na.rm
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+handle_outliers <- function(x,
+                            method = c("quantile", "fixed", "iqr"),
+                            action = c("cap", "na"),
+                            lower = 0.025,
+                            upper = 0.975,
+                            k = 3,
+                            na.rm = TRUE) {
+
+  # 参数验证
+  method <- match.arg(method)
+  action <- match.arg(action)
+  if (!is.numeric(x)) stop("输入x必须是数值向量")
+  if (method == "iqr" && k <= 0) stop("k必须为正数")
+
+  # 计算离群值边界
+  bounds <- switch(method,
+                   "quantile" = {
+                     c(quantile(x, probs = lower, na.rm = na.rm),
+                       quantile(x, probs = upper, na.rm = na.rm))
+                   },
+                   "fixed" = {
+                     c(lower, upper)
+                   },
+                   "iqr" = {
+                     q <- quantile(x, probs = c(0.25, 0.75), na.rm = na.rm)
+                     iqr <- q[2] - q[1]
+                     c(q[1] - k * iqr, q[2] + k * iqr)
+                   }
+  )
+
+  # 执行处理
+  if (action == "cap") {
+    x[x < bounds[1] & !is.na(x)] <- bounds[1]
+    x[x > bounds[2] & !is.na(x)] <- bounds[2]
+  } else {
+    x[x < bounds[1] | x > bounds[2]] <- NA
+  }
+
+  return(x)
 }
