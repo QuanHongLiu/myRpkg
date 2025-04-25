@@ -113,38 +113,50 @@ harmonise_types <- function(target_df, reference_df) {
 #' @param dataframe
 #' @param var_name
 #' @param n
+#' @param reverse
 #'
-#' @return
+#' @returns
 #' @export
 #'
 #' @examples
-quartile_cut <- function(dataframe, var_name, n) {
-  # 检测 dataframe
-  if (!is.data.frame(df)) {
-    stop("Error: The input df must be a data frame.")
+quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
+  # 检查输入是否为数据框
+  if (!is.data.frame(dataframe)) {
+    stop("Error: The input 'dataframe' must be a data frame.")
   }
 
-  # 处理 var_name
-  result <- try({
-    if (is.character(var_name)) {
-      var_name <- var_name
-    }
-  }, silent = TRUE)
-  if (inherits(result, "try-error")) {
-    var_name <- deparse(substitute(var_name))
+  # 处理变量名（支持字符或变量名）
+  var_name_str <- if (is.character(var_name)) var_name else deparse(substitute(var_name))
+
+  # 检查变量是否存在
+  if (!(var_name_str %in% names(dataframe))) {
+    stop(paste("Variable", var_name_str, "not found in dataframe"))
   }
 
-  # 检查 var_name 是否存在于 dataframe
-  if (!exists(var_name, where = dataframe)) {
-    stop(paste("Object", var_name, "not found in dataframe"))
+  # 检查变量是否为数值型
+  if (!is.numeric(dataframe[[var_name_str]])) {
+    stop(paste("Variable", var_name_str, "must be numeric"))
   }
 
-  # 检查 变量是否为数值
-  dataframe[[paste0(var_name, n)]] <- cut(dataframe[[var_name]],
-                                          breaks = quantile(dataframe[[var_name]],
-                                                            probs = seq(0, 1, 1/n),na.rm = T),
-                                          include.lowest = TRUE,
-                                          labels = as.character(1:n))
+  # 计算分位数
+  quantiles <- quantile(
+    dataframe[[var_name_str]],
+    probs = seq(0, 1, 1/n),
+    na.rm = TRUE
+  )
+
+  # 动态生成标签
+  labels <- if (reverse) as.character(n:1) else as.character(1:n)
+
+  # 创建分组变量
+  new_var_name <- paste0(var_name_str, n)
+  dataframe[[new_var_name]] <- cut(
+    dataframe[[var_name_str]],
+    breaks = quantiles,
+    include.lowest = TRUE,
+    labels = labels
+  )
+
   return(dataframe)
 }
 

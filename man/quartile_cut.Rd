@@ -4,10 +4,10 @@
 \alias{quartile_cut}
 \title{Title}
 \usage{
-quartile_cut(dataframe, var_name, n)
+quartile_cut(dataframe, var_name, n, reverse = FALSE)
 }
 \arguments{
-\item{n}{}
+\item{reverse}{}
 }
 \description{
 Title
