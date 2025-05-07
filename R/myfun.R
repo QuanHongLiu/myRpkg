@@ -598,6 +598,7 @@ extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_pre
 
 
 
+
 #' Title
 #'
 #' @param input_vec
@@ -636,12 +637,17 @@ generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_
   # 初始化结果
   field_list <- c()
   output_str <- ""
+  add_str <- ""
   for (var in names(var_field_list)) {
     val <- var_field_list[[var]]
     if (is.null(val)) {
       field_list <- c(field_list, var)
     } else {
       field_list <- c(field_list, val)
+      # 新增需要处理的code
+      add_str <- paste0(add_str,readLines(paste0(dir_path,file_var[[var]],".R"), n = 1), "\n")
+      add_str <- paste0(add_str,"source(","\"",dir_path,file_var[[var]],".R","\"",")", "\n")
+
       # 判断是否保存
       if (!missing(output_dir_prefix) & nchar(output_dir_prefix) > 0){
         # 并且有这么一个代码文件
@@ -661,7 +667,7 @@ generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_
     }
   }
   # 导出结果
-  return(list(field_list = field_list, code = output_str))
+  return(list(field_list = field_list, code = output_str, add_code = add_str))
 }
 
 
@@ -699,10 +705,42 @@ preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_di
   print(Sys.time())
   all <- process_ukb_data(data = all)
 
-  # 返回 数据框
-  print("step4 pasrse")
-  print(Sys.time())
-  eval(parse(text = gsub("\\.R\"\\)", ".R\", local = TRUE)", res$code)))
+
+  # 如果需要保存则保存
+  if (!missing(output_dir_prefix) & nchar(output_dir_prefix) > 0){
+    # 并且有这么一个代码文件
+    if (file.exists(paste0(output_dir_prefix,".Rdata"))) {
+      # 加载这个文件
+      all_new <- all
+      load(paste0(output_dir_prefix,".Rdata"))
+      # 找到除合并键以外的重复列
+      common_cols <- intersect(names(all_new), names(all))
+      common_cols <- setdiff(common_cols, "n_eid")
+      # 去掉 原始 all 中的重复列
+      all <- all %>% select(-all_of(common_cols))
+      # 合并
+      all <- full_join(all, all_new, by = "n_eid")
+      # 前处理
+      print("step4 pasrse")
+      print(Sys.time())
+      eval(parse(text = gsub("\\.R\"\\)", ".R\", local = TRUE)", res$add_code)))
+      # 保存
+      save(all,file = paste0(output_dir_prefix,".Rdata"))
+    } else {
+      # 不存在这个文件就创建一个
+      print("step4 pasrse")
+      print(Sys.time())
+      eval(parse(text = gsub("\\.R\"\\)", ".R\", local = TRUE)", res$code)))
+      # 保存
+      save(all,file = paste0(output_dir_prefix,".Rdata"))
+    }
+  } else {
+    # 返回 数据框
+    print("step4 pasrse")
+    print(Sys.time())
+    eval(parse(text = gsub("\\.R\"\\)", ".R\", local = TRUE)", res$code)))
+    return(all)
+  }
   return(all)
 }
 
