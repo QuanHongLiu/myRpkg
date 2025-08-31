@@ -1,0 +1,7 @@
+.Rproj.user
+.Rproj
+.Rbuildignore
+.Rhistory
+.RData
+.DS_Store
+/*.tar.gz
