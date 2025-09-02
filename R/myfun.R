@@ -59,7 +59,7 @@ extract_model_results_tidy <- function(x, y, model = model, results = results) {
   model_summary <- broom.mixed::tidy(model, conf.int = TRUE)
   model_summary <- cbind(y, model_summary)
   model_summary <- model_summary[grepl(x, model_summary$term), ]
-  names(model_summary)[names(model_summary)=='term'] <- 'y'
+  names(model_summary)[names(model_summary)=='term'] <- 'x'
 
   if (is.data.frame(results)) {
     results <- bind_rows(results, model_summary)
