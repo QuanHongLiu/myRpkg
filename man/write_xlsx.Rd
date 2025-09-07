@@ -4,21 +4,12 @@
 \alias{write_xlsx}
 \title{输出 xlsx 文件}
 \usage{
-write_xlsx(
-  x,
-  file,
-  sheetName = "Sheet1",
-  row_height = 18,
-  auto_width = TRUE,
-  ...
-)
+write_xlsx(data_list, file, row_height = 18, auto_width = TRUE, ...)
 }
 \arguments{
-\item{x}{需要输出的R对象}
+\item{data_list}{数据对应表格的list；如list(Sheet1 = results1, Sheet2 = results2)}
 
 \item{file}{输出文件的路径}
-
-\item{sheetName}{将内容写到哪个表；默认Sheet1}
 
 \item{row_height}{行高；默认18}
 

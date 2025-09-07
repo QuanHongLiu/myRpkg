@@ -126,13 +126,23 @@ harmonise_types <- function(target_df, reference_df) {
 #'
 #' @examples
 quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
+  # 1. 捕获传入的符号并转为字符串（得到的是“传参的名字”）
+  var_sym <- rlang::ensym(var_name)
+  var_name_str <- rlang::as_string(var_sym)
+
+  # 2. 如果调用环境里存在这个名字，并且该对象是长度为1的字符向量，
+  #    则把 var_name_str 替换为该对象的值（也就是支持 x <- "wbc" 的情况）
+  if (exists(var_name_str, envir = parent.frame(), inherits = TRUE)) {
+    possible_val <- get(var_name_str, envir = parent.frame(), inherits = TRUE)
+    if (is.character(possible_val) && length(possible_val) == 1) {
+      var_name_str <- possible_val
+    }
+  }
+
   # 检查输入是否为数据框
   if (!is.data.frame(dataframe)) {
     stop("The input 'dataframe' must be a data frame.")
   }
-
-  # 获取变量名
-  var_name_str <- rlang::as_name(rlang::enquo(var_name))
 
   # 检查变量是否存在且为数值型
   var <- dataframe[[var_name_str]]
@@ -164,10 +174,8 @@ quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
     include.lowest = TRUE,
     labels = if (reverse) as.character(final_n:1) else as.character(1:final_n)
   )
-
   return(dataframe)
 }
-
 
 
 
@@ -175,11 +183,10 @@ quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
 #'
 #' 输出的 xlsx 文件会自动调整列宽
 #'
-#' @param x 需要输出的R对象
+#' @param data_list 数据对应表格的list；如list(Sheet1 = results1, Sheet2 = results2)
 #' @param file 输出文件的路径
-#' @param sheetName 将内容写到哪个表；默认Sheet1
 #' @param row_height 行高；默认18
-#' @param auto_width  列宽；自动
+#' @param auto_width 列宽；自动
 #' @param ...
 #'
 #' @returns
@@ -187,24 +194,27 @@ quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
 #'
 #' @examples
 write_xlsx <- function(
-    x,
+    data_list,
     file,
-    sheetName = "Sheet1",
     row_height = 18,
     auto_width = TRUE,
     ...
 ) {
   wb <- openxlsx::createWorkbook()
-  openxlsx::addWorksheet(wb, sheetName = sheetName)
-  openxlsx::writeData(wb, sheet = sheetName, x = x, ...)
-  openxlsx::setRowHeights(wb, sheet = sheetName, rows = 1:(nrow(x) + 1), heights = row_height)
 
-  if (auto_width) {
-    openxlsx::setColWidths(wb, sheet = sheetName, cols = 1:ncol(x), widths = "auto")
+  for (nm in names(data_list)) {
+    openxlsx::addWorksheet(wb, sheetName = nm)
+    x <- data_list[[nm]]
+    openxlsx::writeData(wb, sheet = nm, x = x, ...)
+    openxlsx::setRowHeights(wb, sheet = nm, rows = 1:(nrow(x) + 1), heights = row_height)
+    if (auto_width) {
+      openxlsx::setColWidths(wb, sheet = nm, cols = 1:ncol(x), widths = "auto")
+    }
   }
 
   openxlsx::saveWorkbook(wb, file = file, overwrite = TRUE)
 }
+
 
 
 
