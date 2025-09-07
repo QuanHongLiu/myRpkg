@@ -7,7 +7,7 @@
 process_ukb_data(data)
 }
 \arguments{
-\item{data}{}
+\item{data}{需要处理的 ukb 数据框}
 }
 \description{
 根据 ukb 的 data showcase，变更变量类型、添加变量标签

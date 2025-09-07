@@ -121,47 +121,50 @@ harmonise_types <- function(target_df, reference_df) {
 #' @param n 将变量分别 n 分位
 #' @param reverse 是否分割后反向赋值
 #'
-#' @returns 返回的是数据框
+#' @returns
 #' @export
 #'
 #' @examples
 quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
   # 检查输入是否为数据框
   if (!is.data.frame(dataframe)) {
-    stop("Error: The input 'dataframe' must be a data frame.")
+    stop("The input 'dataframe' must be a data frame.")
   }
 
-  # 处理变量名（支持字符或变量名）
-  var_name_str <- if (is.character(var_name)) var_name else deparse(substitute(var_name))
+  # 获取变量名
+  var_name_str <- rlang::as_name(rlang::enquo(var_name))
 
-  # 检查变量是否存在
-  if (!(var_name_str %in% names(dataframe))) {
-    stop(paste("Variable", var_name_str, "not found in dataframe"))
+  # 检查变量是否存在且为数值型
+  var <- dataframe[[var_name_str]]
+  if (is.null(var)) {
+    stop("Variable '", var_name_str, "' not found in dataframe")
+  }
+  if (!is.numeric(var)) {
+    stop("Variable '", var_name_str, "' must be numeric")
   }
 
-  # 检查变量是否为数值型
-  if (!is.numeric(dataframe[[var_name_str]])) {
-    stop(paste("Variable", var_name_str, "must be numeric"))
+  # 检查 n 是否有效
+  if (!is.numeric(n) || length(n) != 1 || n <= 0) {
+    stop("n must be a positive integer")
   }
 
-  # 计算分位数
-  quantiles <- quantile(
-    dataframe[[var_name_str]],
-    probs = seq(0, 1, 1/n),
-    na.rm = TRUE
-  )
+  # 计算唯一分位数
+  quantiles <- unique(quantile(var, probs = seq(0, 1, 1/n), na.rm = TRUE))
+  final_n <- length(quantiles) - 1
 
-  # 动态生成标签
-  labels <- if (reverse) as.character(n:1) else as.character(1:n)
+  if (final_n < n) {
+    warning("Only ", final_n, " unique quantile groups created due to ties in the data")
+  }
 
   # 创建分组变量
-  new_var_name <- paste0(var_name_str, n)
+  new_var_name <- paste0(var_name_str, final_n)
   dataframe[[new_var_name]] <- cut(
-    dataframe[[var_name_str]],
+    var,
     breaks = quantiles,
     include.lowest = TRUE,
-    labels = labels
+    labels = if (reverse) as.character(final_n:1) else as.character(1:final_n)
   )
+
   return(dataframe)
 }
 
@@ -207,9 +210,9 @@ write_xlsx <- function(
 
 #' 前处理 ukb 数据
 #'
-#'根据 ukb 的 data showcase，变更变量类型、添加变量标签
+#' 根据 ukb 的 data showcase，变更变量类型、添加变量标签
 #'
-#' @param data
+#' @param data 需要处理的 ukb 数据框
 #'
 #' @returns
 #' @export

@@ -15,9 +15,6 @@ quartile_cut(dataframe, var_name, n, reverse = FALSE)
 
 \item{reverse}{是否分割后反向赋值}
 }
-\value{
-返回的是数据框
-}
 \description{
 分割变量为多分位，默认赋值为1：n
 }
