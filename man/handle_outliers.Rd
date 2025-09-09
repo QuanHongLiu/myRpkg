@@ -15,20 +15,45 @@ handle_outliers(
 )
 }
 \arguments{
-\item{x}{需要处理的变量}
+\item{x}{数值向量（需处理的数据列）}
 
-\item{method}{处理离群值的方法}
+\item{method}{处理离群值的方法；quantile（分位数）/ fixed 固定阈值 / iqr（三倍IQR）}
 
-\item{action}{离群值是要如何处理}
+\item{action}{离群值是要如何处理; cap 离群值封顶/ na 变为 NA}
 
-\item{lower}{分位数处理离群值时的下分位，或是固定阈值时的下阈值}
+\item{lower}{下限值（分位数法时为下分位数，固定阈值法时为下限值，IQR法时不使用）}
 
-\item{upper}{分位数处理离群值时的上分位，或是固定阈值时的上阈值}
+\item{upper}{上限值（分位数法时为上分位数，固定阈值法时为上限值，IQR法时不使用）}
 
-\item{k}{iqr 处理离群值时的 k 倍 iqr}
+\item{k}{IQR法的倍数；默认3}
 
-\item{na.rm}{是否处理 na；默认 TRUE}
+\item{na.rm}{是否忽略缺失值；默认TRUE}
 }
 \description{
 提供三种寻找离群值的方法，以及两种处理离群值的方法
+}
+\details{
+离群值定义方法："quantile"（分位数）、"fixed"（固定阈值）或 "iqr"（三倍IQR）
+
+处理动作："cap"（封顶，默认）或 "na"（替换为NA）
+}
+\examples{
+# 示例数据：含有极端值
+set.seed(123)
+x <- c(rnorm(20, mean = 10, sd = 2), 50, -5)
+
+# 方法1: 分位数法（2.5\% ~ 97.5\%），超出范围的值替换为上下限
+handle_outliers(x, method = "quantile", action = "cap")
+
+# 方法2: 分位数法（改为替换为 NA）
+handle_outliers(x, method = "quantile", action = "na")
+
+# 方法3: 固定阈值（上下限 = 5 和 20），超出部分封顶
+handle_outliers(x, method = "fixed", lower = 5, upper = 20, action = "cap")
+
+# 方法4: IQR 法（3 倍 IQR），超出范围的值替换为 NA
+handle_outliers(x, method = "iqr", action = "na", k = 3)
+
+# 方法5: IQR 法（2 倍 IQR），改为封顶
+handle_outliers(x, method = "iqr", action = "cap", k = 2)
 }

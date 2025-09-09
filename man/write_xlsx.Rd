@@ -4,16 +4,28 @@
 \alias{write_xlsx}
 \title{输出 xlsx 文件}
 \usage{
-write_xlsx(data_list, file, row_height = 18, auto_width = TRUE, ...)
+write_xlsx(
+  x,
+  file,
+  row_height = 18,
+  auto_width = TRUE,
+  font = "Arial",
+  size = 11,
+  ...
+)
 }
 \arguments{
-\item{data_list}{数据对应表格的list；如list(Sheet1 = results1, Sheet2 = results2)}
+\item{x}{需要写入表格的内容, 如果需要写入多个表格需提供 list，如 list(Sheet1 = results1, Sheet2 = results2)}
 
 \item{file}{输出文件的路径}
 
 \item{row_height}{行高；默认18}
 
 \item{auto_width}{列宽；自动}
+
+\item{font}{字体；默认 Arial（中文为微软雅黑）；还可选 Times New Roman（中文为宋体）}
+
+\item{size}{字体大小；默认 11}
 
 \item{...}{}
 }

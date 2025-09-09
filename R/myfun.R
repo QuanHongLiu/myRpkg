@@ -179,42 +179,51 @@ quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
 
 
 
+
 #' 输出 xlsx 文件
 #'
 #' 输出的 xlsx 文件会自动调整列宽
 #'
-#' @param data_list 数据对应表格的list；如list(Sheet1 = results1, Sheet2 = results2)
+#' @param x 需要写入表格的内容, 如果需要写入多个表格需提供 list，如 list(Sheet1 = results1, Sheet2 = results2)
 #' @param file 输出文件的路径
 #' @param row_height 行高；默认18
 #' @param auto_width 列宽；自动
+#' @param font 字体；默认 Arial（中文为微软雅黑）；还可选 Times New Roman（中文为宋体）
+#' @param size 字体大小；默认 11
 #' @param ...
 #'
 #' @returns
 #' @export
 #'
 #' @examples
-write_xlsx <- function(
-    data_list,
-    file,
-    row_height = 18,
-    auto_width = TRUE,
-    ...
-) {
+write_xlsx <- function(x,
+                       file,
+                       row_height = 18,
+                       auto_width = TRUE,
+                       font = "Arial", #  "Times New Roman",
+                       size = 11,
+                       ...) {
   wb <- openxlsx::createWorkbook()
 
-  for (nm in names(data_list)) {
-    openxlsx::addWorksheet(wb, sheetName = nm)
-    x <- data_list[[nm]]
-    openxlsx::writeData(wb, sheet = nm, x = x, ...)
-    openxlsx::setRowHeights(wb, sheet = nm, rows = 1:(nrow(x) + 1), heights = row_height)
-    if (auto_width) {
-      openxlsx::setColWidths(wb, sheet = nm, cols = 1:ncol(x), widths = "auto")
-    }
+  style <- openxlsx::createStyle(fontName = font, fontSize = size)
+
+  if (!is.list(x) | is.data.frame(x)) {
+    x <- as.data.frame(x)
+    x <- list(Sheet1 = x)
   }
 
+  for (nm in names(x)) {
+    openxlsx::addWorksheet(wb, sheetName = nm)
+    data <- x[[nm]]
+    openxlsx::writeData(wb, sheet = nm, x = data, ...)
+    openxlsx::addStyle(wb, nm, style = style, rows = 1:(nrow(data)+1), cols = 1:ncol(data), gridExpand = TRUE)
+    openxlsx::setRowHeights(wb, nm, rows = 1:(nrow(data)+1), heights = row_height)
+    if (auto_width) {
+      openxlsx::setColWidths(wb, nm, cols = 1:ncol(data), widths = "auto")
+    }
+  }
   openxlsx::saveWorkbook(wb, file = file, overwrite = TRUE)
 }
-
 
 
 
@@ -773,34 +782,44 @@ preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_di
 
 
 
-
-# x 数值向量（需处理的数据列）
-# 离群值定义方法："quantile"（分位数）、"fixed"（固定阈值）或 "iqr"（三倍IQR）
-
-# 处理动作："cap"（封顶，默认）或 "na"（替换为NA）
-
-# lower 下限值（分位数法时为下分位数，固定阈值法时为下限值，IQR法时不使用）
-# upper 上限值（分位数法时为上分位数，固定阈值法时为上限值，IQR法时不使用）
-# k IQR法的倍数（默认3）
-# na.rm 是否忽略缺失值（默认TRUE）
-
-
 #' 处理离群值
 #'
 #' 提供三种寻找离群值的方法，以及两种处理离群值的方法
 #'
-#' @param x 需要处理的变量
-#' @param method 处理离群值的方法
-#' @param action 离群值是要如何处理
-#' @param lower 分位数处理离群值时的下分位，或是固定阈值时的下阈值
-#' @param upper 分位数处理离群值时的上分位，或是固定阈值时的上阈值
-#' @param k iqr 处理离群值时的 k 倍 iqr
-#' @param na.rm 是否处理 na；默认 TRUE
+#' 离群值定义方法："quantile"（分位数）、"fixed"（固定阈值）或 "iqr"（三倍IQR）
+#'
+#' 处理动作："cap"（封顶，默认）或 "na"（替换为NA）
+#'
+#' @param x 数值向量（需处理的数据列）
+#' @param method 处理离群值的方法；quantile（分位数）/ fixed 固定阈值 / iqr（三倍IQR）
+#' @param action 离群值是要如何处理; cap 离群值封顶/ na 变为 NA
+#' @param lower 下限值（分位数法时为下分位数，固定阈值法时为下限值，IQR法时不使用）
+#' @param upper 上限值（分位数法时为上分位数，固定阈值法时为上限值，IQR法时不使用）
+#' @param k IQR法的倍数；默认3
+#' @param na.rm 是否忽略缺失值；默认TRUE
 #'
 #' @returns
 #' @export
 #'
 #' @examples
+#' # 示例数据：含有极端值
+#' set.seed(123)
+#' x <- c(rnorm(20, mean = 10, sd = 2), 50, -5)
+#'
+#' # 方法1: 分位数法（2.5% ~ 97.5%），超出范围的值替换为上下限
+#' handle_outliers(x, method = "quantile", action = "cap")
+#'
+#' # 方法2: 分位数法（改为替换为 NA）
+#' handle_outliers(x, method = "quantile", action = "na")
+#'
+#' # 方法3: 固定阈值（上下限 = 5 和 20），超出部分封顶
+#' handle_outliers(x, method = "fixed", lower = 5, upper = 20, action = "cap")
+#'
+#' # 方法4: IQR 法（3 倍 IQR），超出范围的值替换为 NA
+#' handle_outliers(x, method = "iqr", action = "na", k = 3)
+#'
+#' # 方法5: IQR 法（2 倍 IQR），改为封顶
+#' handle_outliers(x, method = "iqr", action = "cap", k = 2)
 handle_outliers <- function(x,
                             method = c("quantile", "fixed", "iqr"),
                             action = c("cap", "na"),
@@ -841,3 +860,136 @@ handle_outliers <- function(x,
 
   return(x)
 }
+
+
+
+
+#' 回归分析
+#'
+#' 可以循环自变量和因变量并按一般格式提取结果
+#'
+#' 该函数会执行以下操作：
+#'
+#' 1、遍历 x（暴露）和 y（结局），做连续 + 分类 + 趋势三种回归；
+#'
+#' 2、提取结果；
+#'
+#' 3、整理成 Sheet1 (常用格式) ; Sheet2 (画图格式); Sheet3 (原始格式)
+#'
+#' 4、输出 Excel
+#'
+#' @param data 传入的数据框；默认为 all
+#' @param x_vars 自变量向量
+#' @param y_vars 因变量项量
+#' @param covariates 协变量项量
+#' @param n 分类回归类别数；默认为 4
+#' @param file 结果输出文件
+#' @param model_fun 模型名；默认 lm 模型，可改为 glm, lmer 等
+#' @param model_args 额外传递给模型的参数
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+#' # 线性回归（默认）
+#' out <- run_regression_analysis(df = all,
+#'                                x_vars = c("wbc","neuc"),
+#'                                y_vars = c("fev1","fvc"),
+#'                                covariates = c("age","sex","height"),
+#'                                n = 4,
+#'                                file = "~/exp_lm.xlsx")
+#'
+#' # 广义线性回归（比如 logistic 回归）
+#' out <- run_regression_analysis(df = all,
+#'                                x_vars = c("wbc","neuc"),
+#'                                y_vars = c("disease"),
+#'                                covariates = c("age","sex","height"),
+#'                                n = 4,
+#'                                file = "~/exp_glm.xlsx",
+#'                                model_fun = glm,
+#'                                model_args = list(family = binomial))
+#'
+#' # 混合效应模型（lme4::lmer）
+#' out <- run_regression_analysis(df = all,
+#'                                x_vars = c("wbc"),
+#'                                y_vars = c("fev1"),
+#'                                covariates = c("nl","xb","sg"),
+#'                                n = 4,
+#'                                file = "~/opp_lmer.xlsx",
+#'                                model_fun = lme4::lmer,
+#'                                model_args = list(REML = FALSE))
+run_regression_analysis <- function(data = all,
+                                    x_vars,
+                                    y_vars,
+                                    covariates,
+                                    n = 4,
+                                    file = NULL,
+                                    model_fun = lm,
+                                    model_args = list()) {
+  results <- data.frame()
+
+  for (x in x_vars) {
+    for (y in y_vars) {
+      df <- data
+      df <- quartile_cut(df, x, n)
+
+      # 连续 x
+      formula <- as.formula(paste0(y,'~',x,"+", paste(covariates, collapse = "+")))
+      model <- do.call(model_fun, c(list(formula, data = df), model_args))
+      results <- extract_model_results_tidy(x, y, model, results)
+
+      # 分类 x
+      formula <- as.formula(paste0(y,'~',x,n,"+", paste(covariates, collapse = "+")))
+      model <- do.call(model_fun, c(list(formula, data = df), model_args))
+      results <- extract_model_results_tidy(x, y, model, results)
+
+      # P for trend
+      df[[paste0(x,n)]] <- as.numeric(df[[paste0(x,n)]])
+      formula <- as.formula(paste0(y,'~',x,n,"+", paste(covariates, collapse = "+")))
+      model <- do.call(model_fun, c(list(formula, data = df), model_args))
+      results <- extract_model_results_tidy(x, y, model, results)
+      df[[paste0(x,n)]] <- as.factor(df[[paste0(x,n)]])
+    }
+  }
+
+  # 格式化
+  results$beta_CI_tidy <- sprintf("%.2f (%.2f, %.2f)",
+                                  results$estimate, results$conf.low, results$conf.high)
+  results <- results %>%
+    dplyr::mutate(p.value3 = ifelse(p.value < 0.001, "<0.001", round(p.value, 3)))
+
+  # 整理宽表
+  results_data <- results[,c('x','y','beta_CI_tidy','p.value3')]
+  results_plot <- results[,c('x','y','estimate','conf.low','conf.high','p.value3')]
+
+  raw_names_data <- names(results_data)
+  raw_names_plot <- names(results_plot)
+
+  results_data <- as.data.frame(matrix(t(results_data), ncol = (n+1)*ncol(results_data), byrow = TRUE))
+  results_plot <- as.data.frame(matrix(t(results_plot), ncol = (n+1)*ncol(results_plot), byrow = TRUE))
+
+  names(results_data) <- unlist(lapply(1:(n+1), function(i) paste(raw_names_data, i, sep = "_")))
+  names(results_plot) <- unlist(lapply(1:(n+1), function(i) paste(raw_names_plot, i, sep = "_")))
+
+  results_data$ref <- "0 (ref.)"
+  results_plot$ref <- "0 (ref.)"
+
+  results_data <- results_data[,c('x_1','y_1','beta_CI_tidy_1','p.value3_1','ref',
+                                  paste0("beta_CI_tidy_", 2:n), paste0("p.value3_", n+1))]
+  results_plot <- results_plot[,c('x_1','y_1','estimate_1','conf.low_1','conf.high_1','p.value3_1','ref',
+                                  as.vector(outer(c("estimate", "conf.low", "conf.high"), 2:n, paste, sep = "_")),
+                                  paste0("p.value3_", n+1))]
+
+  # 导出
+  if (!is.null(file)) {
+    write_xlsx(list(Sheet1 = results_data,
+                    Sheet2 = results_plot,
+                    Sheet3 = results),
+               file = file)
+  }
+
+  return(list(results_data = results_data,
+              results_plot = results_plot,
+              results = results))
+}
+
