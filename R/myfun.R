@@ -993,3 +993,102 @@ run_regression_analysis <- function(data = all,
               results = results))
 }
 
+
+
+
+#' 提取疾病第一次发病函数提取发病时间
+#'
+#' 提取 UKB 中疾病的第一次发病时间
+#'
+#' 可以单独只使用 icd 10 或 icd 9, 不用的空着就行。
+#'
+#' 生成的变量名为 paste0(disease, '_first_date')。返回的结果为数据框。
+#'
+#' @param disease_names 疾病字符串或疾病项量；自定义某种疾病的名称
+#' @param disease_10_codes_list 单个疾病 icd10 项量，或多个疾病 icd10 项量的 list
+#' @param disease_9_codes_list 单个疾病 icd9 项量，或多个疾病 icd9 项量的 list
+#' @param data 需要处理数据
+#'
+#' @returns 处理好的数据框
+#' @export
+#'
+#' @examples
+#' # 单个疾病
+#' all <- get_first_diseases_date(
+#'   disease_names  = "hemopathy",
+#'   disease_10_codes_list = c("D70", "D71", "D72", "D75", "D76", "D77"),
+#'   disease_9_codes_list  = c("288", "289"),
+#'   data = all)
+#'
+#' # 多个疾病
+#' all <- get_first_diseases_date(
+#'   disease_names = c("hemopathy", "respiratory"),
+#'   disease_10_codes_list = list(
+#'     c("D70", "D71", "D72", "D75", "D76", "D77"),
+#'     c("J40", "J41", "J42")),
+#'   disease_9_codes_list = list(
+#'     c("288", "289"),
+#'     c("490", "491")),
+#'   data = all)
+get_first_diseases_date <- function(disease_names,
+                                    disease_10_codes_list = list(),
+                                    disease_9_codes_list = list(),
+                                    data = all) {
+  # 兼容：如果不是 list，则转为 list
+  if (!is.list(disease_10_codes_list)) {
+    disease_10_codes_list <- list(disease_10_codes_list)
+  }
+  if (!is.list(disease_9_codes_list)) {
+    disease_9_codes_list <- list(disease_9_codes_list)
+  }
+  if (!is.vector(disease_names)) {
+    disease_names <- c(disease_names)
+  }
+
+  data <- as.data.frame(data)   # 防止 data.table 报错
+
+  # icd 10 矩阵
+  icd_mat_10 <- as.matrix(data[, grep("^s_41270_0_", names(data), value = TRUE)])
+  date_mat_10 <- as.matrix(data[, grep("^s_41280_0_", names(data), value = TRUE)])
+
+  # icd 9 矩阵
+  icd_mat_9 <- as.matrix(data[, grep("^s_41271_0_", names(data), value = TRUE)])
+  date_mat_9 <- as.matrix(data[, grep("^s_41281_0_", names(data), value = TRUE)])
+
+  # 加载 icd 数据
+  data(icd)
+
+  for (i in seq_along(disease_names)) {
+    x <- disease_names[i]
+    codes_10 <- icd$ICD10[icd$ICD10_cls %in% disease_10_codes_list[[i]]]
+    codes_9  <- icd$ICD9[icd$ICD9_cls %in% disease_9_codes_list[[i]]]
+
+    # 筛选 ICD10
+    dates_icd10 <- matrix(NA, nrow = nrow(icd_mat_10), ncol = ncol(icd_mat_10))
+    dates_icd10[icd_mat_10 %in% codes_10] <- date_mat_10[icd_mat_10 %in% codes_10]
+
+    # 筛选 ICD9
+    dates_icd9 <- matrix(NA, nrow = nrow(icd_mat_9), ncol = ncol(icd_mat_9))
+    dates_icd9[icd_mat_9 %in% codes_9] <- date_mat_9[icd_mat_9 %in% codes_9]
+
+    # 取最早日期
+    first_date <- do.call(
+      pmin,
+      c(as.data.frame(dates_icd10),
+        as.data.frame(dates_icd9),
+        na.rm = TRUE)
+    )
+
+    # 写入结果
+    data[[paste0(x, '_first_date')]] <- as.Date(first_date)
+    attr(data[[paste0(x, '_first_date')]], "label") <- paste0("Date of first reported ", x)
+    attr(data[[paste0(x, '_first_date')]], "source_field") <- "s_41270_*_*, s_41271_*_*, s_41280_*_*, s_41281_*_*"
+  }
+
+  return(data)
+}
+
+
+
+
+
