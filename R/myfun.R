@@ -1048,8 +1048,13 @@ get_first_diseases_date <- function(disease_names,
   data <- as.data.frame(data)   # 防止 data.table 报错
 
   # icd 10 矩阵
-  icd_mat_10 <- as.matrix(data[, grep("^s_41270_0_", names(data), value = TRUE)])
-  date_mat_10 <- as.matrix(data[, grep("^s_41280_0_", names(data), value = TRUE)])
+  icd_mat_10 <- as.matrix(data[, c(grep("^s_41270_0_", names(data), value = TRUE),
+                                   grep("^s_40006_(0|[1-9]|1[0-9]|20)_0$", names(data), value = TRUE)
+  )])
+
+  date_mat_10 <- as.matrix(data[, c(grep("^s_41280_0_", names(data), value = TRUE),
+                                    grep("^s_40005_(0|[1-9]|1[0-9]|20)_0$", names(data), value = TRUE)
+  )])
 
   # icd 9 矩阵
   icd_mat_9 <- as.matrix(data[, grep("^s_41271_0_", names(data), value = TRUE)])
@@ -1082,11 +1087,12 @@ get_first_diseases_date <- function(disease_names,
     # 写入结果
     data[[paste0(x, '_first_date')]] <- as.Date(first_date)
     attr(data[[paste0(x, '_first_date')]], "label") <- paste0("Date of first reported ", x)
-    attr(data[[paste0(x, '_first_date')]], "source_field") <- "s_41270_*_*, s_41271_*_*, s_41280_*_*, s_41281_*_*"
+    attr(data[[paste0(x, '_first_date')]], "source_field") <- "s_41270_*_*, s_41271_*_*, s_41280_*_*, s_41281_*_*, s_40005_*_*, s_40006_*_*"
   }
 
   return(data)
 }
+
 
 
 
