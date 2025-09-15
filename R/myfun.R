@@ -1162,7 +1162,7 @@ get_death_causes_date <- function(death_causes,
     # primary_secondary
     primary_match <- death_primary %in% codes
     secondary_match <- matrix(death_secondary %in% codes, nrow=nrow(death_secondary), ncol=ncol(death_secondary))
-    secondary_match <- apply(secondary_matrix, 1, any)
+    secondary_match <- apply(secondary_match, 1, any)
 
 
     # 根据 primary_secondary 参数选择策略
@@ -1174,13 +1174,13 @@ get_death_causes_date <- function(death_causes,
     )
 
     # 填充日期字段
-    data[[paste0('death_', death_causes, '_date')]] <- as.Date(NA)
-    data[[paste0('death_', death_causes, '_date')]][target_rows] <- data$s_40000_0_0[target_rows]
+    data[[paste0('death_', cause, '_date')]] <- as.Date(NA)
+    data[[paste0('death_', cause, '_date')]][target_rows] <- data$s_40000_0_0[target_rows]
     class(data$death_diabetes_date)
 
     # 写入结果
-    attr(data[[paste0('death_', death_causes, '_date')]], "label") <- paste0("Date of death caused by ", x)
-    attr(data[[paste0('death_', death_causes, '_date')]], "source_field") <- "s_40000_*_*, s_40001_*_*, s_40002_*_*"
+    attr(data[[paste0('death_', cause, '_date')]], "label") <- paste0("Date of death caused by ", cause)
+    attr(data[[paste0('death_', cause, '_date')]], "source_field") <- "s_40000_*_*, s_40001_*_*, s_40002_*_*"
   }
   return(data)
 }
