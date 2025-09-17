@@ -1145,7 +1145,7 @@ get_death_causes_date <- function(death_causes,
 
   # 主要死因（优先用 s_40001_1_0 覆盖 s_40001_0_0）
   death_primary <- as.character(data$s_40001_0_0)
-  death_primary[!is.na(data$s_40001_1_0)] <- data$s_40001_1_0[!is.na(data$s_40001_1_0)]
+  death_primary[!is.na(data$s_40001_1_0)] <- as.character(data$s_40001_1_0[!is.na(data$s_40001_1_0)])
 
 
   # secondary cause of death
@@ -1158,6 +1158,7 @@ get_death_causes_date <- function(death_causes,
   for (i in seq_along(death_causes)) {
     cause <- death_causes[i]
     codes <- icd$ICD10[icd$ICD10_cls %in% death_codes_list[[i]]]  # 使用 ICD10 编码
+    codes <- na.omit(codes)
 
     # primary_secondary
     primary_match <- death_primary %in% codes
@@ -1184,6 +1185,7 @@ get_death_causes_date <- function(death_causes,
   }
   return(data)
 }
+
 
 
 
