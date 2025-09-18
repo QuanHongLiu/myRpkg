@@ -1,8 +1,49 @@
 
 
+
+
+#' 将模型结果的列名统一为与 broom::tidy() 一致的格式
+#'
+#' @param df 需要统一的数据框
+#'
+#' @returns 处理好的数据框
+#' @export
+#'
+#' @examples
+standardize_tidy_names <- function(df) {
+  # 定义匹配规则（关键词->目标列名）
+  name_map <- list(
+    estimate   = c("estimate", "est", "coef", "coefficient"),
+    std.error  = c("std.error", "se", "standard error", "std error", 'Std. Error'),
+    statistic  = c("t value", "z value", "f value", "statistic", "t.value", "z.value"),
+    p.value    = c("p.value", "pvalue", "p_value", "Pr(>|z|)", "Pr(>|t|)"),
+    conf.low   = c("2.5 %", "conf.low", "lower", "CI_low"),
+    conf.high  = c("97.5 %", "conf.high", "upper", "CI_high")
+  )
+
+  # 获取原始列名（保留大小写）
+  original_names <- colnames(df)
+
+  # 遍历每个目标列名，精确匹配并替换
+  for (target in names(name_map)) {
+    # 检查原始列名是否在 name_map 的候选列表中（忽略大小写）
+    matched_col <- original_names[tolower(original_names) %in% tolower(name_map[[target]])]
+    if (length(matched_col) >= 1) {
+      # 只替换第一个匹配的列（避免多列冲突）
+      colnames(df)[original_names == matched_col[1]] <- target
+    }
+  }
+
+  return(df)
+}
+
+
+
+
+
 #' 提取模型结果 confint 计算置信区间
 #'
-#' 提取模型的结果，包括 β、sd、confint等等。该函数使用 confint 计算置信区间，当模型为混合模型时，耗时较长
+#' 提取模型的结果，包括 β、se、confint等等。该函数使用 confint 计算置信区间，当模型为混合模型时，耗时较长
 #'
 #' 该函数还可根据因变量类型，自动处理为 OR 或 HR
 #'
@@ -16,15 +57,28 @@
 #'
 #' @examples
 extract_model_results_conf <- function(x, y, model = model, results = results) {
+  # 判断是否需要取指数（exp(β)）
+  exponentiate <- FALSE
+  # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
+  if (inherits(model, "glm") && model$family$family == "binomial") {
+    exponentiate <- TRUE
+  }
+  # 情况2：模型是Cox回归 → 计算HR
+  if (inherits(model, "coxph")) {
+    exponentiate <- TRUE
+  }
+  # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
+  dep_var <- all.vars(formula(model))[1]
+  dep_data <- model.frame(model)[[dep_var]]
+  if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
+    exponentiate <- TRUE
+  }
+
   # 提取模型系数
   model_summary <- summary(model)$coefficients
-  model_summary <- as.data.frame(model_summary) %>% tibble::rownames_to_column(var = "term")
-
-
-
+  model_summary <- as.data.frame(model_summary) %>% tibble::rownames_to_column(var = "x")
   model_summary <- cbind(y, model_summary)
-  model_summary <- model_summary[grepl(x, model_summary$term), ]
-  names(model_summary)[names(model_summary)=='term'] <- 'x'
+  model_summary <- model_summary[grepl(x, model_summary$x), ]
 
   # 提取模型通过 bootstrap 得到的置信区间
   model_confint <- confint(model)
@@ -33,37 +87,15 @@ extract_model_results_conf <- function(x, y, model = model, results = results) {
 
   # 合并结果
   res <- cbind(model_summary, model_confint)
-
-  # 判断是否需要取指数（exp(β)）
-  need_exp <- FALSE
-
-  # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
-  if (inherits(model, "glm") && model$family$family == "binomial") {
-    need_exp <- TRUE
-  }
-
-  # 情况2：模型是Cox回归 → 计算HR
-  if (inherits(model, "coxph")) {
-    need_exp <- TRUE
-  }
-
-  # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
-  dep_var <- all.vars(formula(model))[1]
-  dep_data <- model.frame(model)[[dep_var]]
-  if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
-    need_exp <- TRUE
-  }
-
+  res <- standardize_tidy_names(res)
 
   # 如果需要exp(β)，转换系数和置信区间
-  if (need_exp) {
+  if (exponentiate) {
     res <- res %>%
       mutate(
         estimate = exp(estimate),
         conf.low = exp(conf.low),
-        conf.high = exp(conf.high),
-        `2.5 %` = exp(`2.5 %`),
-        `97.5 %` = exp(`97.5 %`)
+        conf.high = exp(conf.high)
       )
   }
 
@@ -78,8 +110,25 @@ extract_model_results_conf <- function(x, y, model = model, results = results) {
   return(results)
 }
 # extract_model_results_conf <- function(x, y, model = model, results = results) {
+#   # 判断是否需要取指数（exp(β)）
+#   exponentiate <- FALSE
+#   # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
+#   if (inherits(model, "glm") && model$family$family == "binomial") {
+#     exponentiate <- TRUE
+#   }
+#   # 情况2：模型是Cox回归 → 计算HR
+#   if (inherits(model, "coxph")) {
+#     exponentiate <- TRUE
+#   }
+#   # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
+#   dep_var <- all.vars(formula(model))[1]
+#   dep_data <- model.frame(model)[[dep_var]]
+#   if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
+#     exponentiate <- TRUE
+#   }
+#
 #   # 提取模型系数
-#   model_summary <- broom.mixed::tidy(model, conf.int = TRUE)
+#   model_summary <- broom.mixed::tidy(model, conf.int = FALSE, exponentiate = exponentiate)
 #   model_summary <- cbind(y, model_summary)
 #   model_summary <- model_summary[grepl(x, model_summary$term), ]
 #   names(model_summary)[names(model_summary)=='term'] <- 'x'
@@ -91,39 +140,7 @@ extract_model_results_conf <- function(x, y, model = model, results = results) {
 #
 #   # 合并结果
 #   res <- cbind(model_summary, model_confint)
-#
-#   # 判断是否需要取指数（exp(β)）
-#   need_exp <- FALSE
-#
-#   # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
-#   if (inherits(model, "glm") && model$family$family == "binomial") {
-#     need_exp <- TRUE
-#   }
-#
-#   # 情况2：模型是Cox回归 → 计算HR
-#   if (inherits(model, "coxph")) {
-#     need_exp <- TRUE
-#   }
-#
-#   # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
-#   dep_var <- all.vars(formula(model))[1]
-#   dep_data <- model.frame(model)[[dep_var]]
-#   if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
-#     need_exp <- TRUE
-#   }
-#
-#
-#   # 如果需要exp(β)，转换系数和置信区间
-#   if (need_exp) {
-#     res <- res %>%
-#       mutate(
-#         estimate = exp(estimate),
-#         conf.low = exp(conf.low),
-#         conf.high = exp(conf.high),
-#         `2.5 %` = exp(`2.5 %`),
-#         `97.5 %` = exp(`97.5 %`)
-#       )
-#   }
+#   res <- standardize_tidy_names(res)
 #
 #   # 合并到 results
 #   if (is.data.frame(results)) {
@@ -138,9 +155,9 @@ extract_model_results_conf <- function(x, y, model = model, results = results) {
 
 
 
-#' 提取模型结果-用 broom 默认方式计算置信区间
+#' 提取模型结果-用 wald 法计算置信区间
 #'
-#' 提取模型的结果，包括 β、sd、confint等等。该函数使用 broom 计算置信区间，即直接使用 β±sd 的方式，耗时较短。
+#' 提取模型的结果，包括 β、se、confint等等。该函数使用 wald 计算置信区间，即直接使用 β ± 1.96se 的方式，耗时较短。
 #'
 #' 该函数还可根据因变量类型，自动处理为 OR 或 HR
 #'
@@ -153,41 +170,37 @@ extract_model_results_conf <- function(x, y, model = model, results = results) {
 #' @export
 #'
 #' @examples
-extract_model_results_tidy <- function(x, y, model = model, results = results) {
-  # 提取模型系数（使用broom或broom.mixed）
-  print(paste0(Sys.time(),'-- 开始 ', model, ' 提取模型结果'))
-  model_summary <- broom::tidy(model, conf.int = TRUE)
-  print(paste0(Sys.time(),'-- 开始 ', model, ' 提取模型结果'))
-
-  # 判断是否需要取指数（exp(β)）
-  need_exp <- FALSE
-
+extract_model_results_wald <- function(x, y, model = model, results = results) {
+  # 判断是否需要取指数（exp(β))
+  exponentiate <- FALSE
   # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
   if (inherits(model, "glm") && model$family$family == "binomial") {
-    need_exp <- TRUE
+    exponentiate <- TRUE
   }
-
   # 情况2：模型是Cox回归 → 计算HR
   if (inherits(model, "coxph")) {
-    need_exp <- TRUE
+    exponentiate <- TRUE
   }
-
   # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
   dep_var <- all.vars(formula(model))[1]
   dep_data <- model.frame(model)[[dep_var]]
   if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
-    need_exp <- TRUE
+    exponentiate <- TRUE
   }
 
-
-  # 保留与自变量x相关的行（匹配x或x的分组变量名）
+  # 提取模型系数
+  model_summary <- summary(model)$coefficients
+  model_summary <- as.data.frame(model_summary) %>% tibble::rownames_to_column(var = "x")
   model_summary <- cbind(y, model_summary)
-  model_summary <- model_summary[grepl(x, model_summary$term), ]
-  names(model_summary)[names(model_summary)=='term'] <- 'x'
+  model_summary <- model_summary[grepl(x, model_summary$x), ]
+  model_summary <- standardize_tidy_names(model_summary)
 
+  # 提取模型通过 β ± 1.96 × SE 得到的置信区间
+  model_summary$conf.low <- model_summary$estimate - 1.96 * model_summary$std.error
+  model_summary$conf.high <- model_summary$estimate + 1.96 * model_summary$std.error
 
   # 如果需要exp(β)，转换系数和置信区间
-  if (need_exp) {
+  if (exponentiate) {
     model_summary <- model_summary %>%
       mutate(
         estimate = exp(estimate),
@@ -206,8 +219,25 @@ extract_model_results_tidy <- function(x, y, model = model, results = results) {
   return(results)
 }
 # extract_model_results_tidy <- function(x, y, model = model, results = results) {
+#   # 判断是否需要取指数（exp(β)）
+#   exponentiate <- FALSE
+#   # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
+#   if (inherits(model, "glm") && model$family$family == "binomial") {
+#     exponentiate <- TRUE
+#   }
+#   # 情况2：模型是Cox回归 → 计算HR
+#   if (inherits(model, "coxph")) {
+#     exponentiate <- TRUE
+#   }
+#   # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
+#   dep_var <- all.vars(formula(model))[1]
+#   dep_data <- model.frame(model)[[dep_var]]
+#   if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
+#     exponentiate <- TRUE
+#   }
+#
 #   # 提取模型系数
-#   model_summary <- broom.mixed::tidy(model, conf.int = TRUE)
+#   model_summary <- broom.mixed::tidy(model, conf.int = TRUE, exponentiate = exponentiate)
 #   model_summary <- cbind(y, model_summary)
 #   model_summary <- model_summary[grepl(x, model_summary$term), ]
 #   names(model_summary)[names(model_summary)=='term'] <- 'x'
@@ -1040,6 +1070,7 @@ handle_outliers <- function(x,
 #' @param file 结果输出文件
 #' @param model_fun 模型名；默认 lm 模型，可改为 glm, lmer 等
 #' @param model_args 额外传递给模型的参数
+#' @param extract_fun 提取模型结果时选用的函数方法；默认 extract_model_results_wald，还可选 extract_model_results_conf
 #'
 #' @returns
 #' @export
@@ -1079,29 +1110,32 @@ run_continuous_regression <- function(data = all,
                                     n = 4,
                                     file = NULL,
                                     model_fun = lm,
-                                    model_args = list()) {
+                                    model_args = list(),
+                                    extract_fun = extract_model_results_wald) {
   results <- data.frame()
 
   for (x in x_vars) {
     for (y in y_vars) {
+      # 过程显示
+      print(paste0(Sys.time(),' -- 开始 自变量：', x,' 因变量：',y))
       df <- data
       df <- quartile_cut(df, x, n)
 
       # 连续 x
       formula <- as.formula(paste0(y,'~',x,"+", paste(covariates, collapse = "+")))
       model <- do.call(model_fun, c(list(formula, data = df), model_args))
-      results <- extract_model_results_tidy(x, y, model, results)
+      results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results))
 
       # 分类 x
       formula <- as.formula(paste0(y,'~',x,n,"+", paste(covariates, collapse = "+")))
       model <- do.call(model_fun, c(list(formula, data = df), model_args))
-      results <- extract_model_results_tidy(x, y, model, results)
+      results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results))
 
       # P for trend
       df[[paste0(x,n)]] <- as.numeric(df[[paste0(x,n)]])
       formula <- as.formula(paste0(y,'~',x,n,"+", paste(covariates, collapse = "+")))
       model <- do.call(model_fun, c(list(formula, data = df), model_args))
-      results <- extract_model_results_tidy(x, y, model, results)
+      results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results))
       df[[paste0(x,n)]] <- as.factor(df[[paste0(x,n)]])
     }
   }
@@ -1172,6 +1206,7 @@ run_continuous_regression <- function(data = all,
 #' @param file 结果输出文件
 #' @param model_fun 模型名；默认 lm 模型，可改为 glm, lmer 等
 #' @param model_args 额外传递给模型的参数
+#' @param extract_fun 提取模型结果时选用的函数方法；默认 extract_model_results_wald，还可选 extract_model_results_conf
 #'
 #' @returns
 #' @export
@@ -1183,11 +1218,14 @@ run_categorical_regression <- function(data = all,
                                        covariates,
                                        file = NULL,
                                        model_fun = lm,
-                                       model_args = list()) {
+                                       model_args = list(),
+                                       extract_fun = extract_model_results_wald) {
   results <- data.frame()
 
   for (x in x_vars) {
     for (y in y_vars) {
+      # 过程显示
+      print(paste0(Sys.time(),' -- 开始 自变量：', x,' 因变量：',y))
       df <- data
 
       # 确保自变量是因子类型
@@ -1200,7 +1238,7 @@ run_categorical_regression <- function(data = all,
       model <- do.call(model_fun, c(list(formula, data = df), model_args))
 
       # 提取结果
-      results <- extract_model_results_tidy(x, y, model, results)
+      results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results))
     }
   }
 
@@ -1226,6 +1264,7 @@ run_categorical_regression <- function(data = all,
               results_plot = results_plot,
               results = results))
 }
+
 
 
 

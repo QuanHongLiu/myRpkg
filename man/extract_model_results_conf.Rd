@@ -19,7 +19,7 @@ extract_model_results_conf(x, y, model = model, results = results)
 结果的数据框
 }
 \description{
-提取模型的结果，包括 β、sd、confint等等。该函数使用 confint 计算置信区间，当模型为混合模型时，耗时较长
+提取模型的结果，包括 β、se、confint等等。该函数使用 confint 计算置信区间，当模型为混合模型时，耗时较长
 }
 \details{
 该函数还可根据因变量类型，自动处理为 OR 或 HR

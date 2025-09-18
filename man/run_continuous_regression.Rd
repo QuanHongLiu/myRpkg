@@ -12,7 +12,8 @@ run_continuous_regression(
   n = 4,
   file = NULL,
   model_fun = lm,
-  model_args = list()
+  model_args = list(),
+  extract_fun = extract_model_results_wald
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ run_continuous_regression(
 \item{model_fun}{模型名；默认 lm 模型，可改为 glm, lmer 等}
 
 \item{model_args}{额外传递给模型的参数}
+
+\item{extract_fun}{提取模型结果时选用的函数方法；默认 extract_model_results_wald，还可选 extract_model_results_conf}
 }
 \description{
 可以循环自变量和因变量并按一般格式提取结果
