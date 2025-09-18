@@ -19,5 +19,8 @@ extract_model_results_tidy(x, y, model = model, results = results)
 结果的数据框
 }
 \description{
-提取模型的结果，包括 β、sd、confint等等。该函数使用 broom 计算置信区间，即直接使用 β±sd 的方式，耗时较短
+提取模型的结果，包括 β、sd、confint等等。该函数使用 broom 计算置信区间，即直接使用 β±sd 的方式，耗时较短。
+}
+\details{
+该函数还可根据因变量类型，自动处理为 OR 或 HR
 }

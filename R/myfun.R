@@ -4,6 +4,8 @@
 #'
 #' 提取模型的结果，包括 β、sd、confint等等。该函数使用 confint 计算置信区间，当模型为混合模型时，耗时较长
 #'
+#' 该函数还可根据因变量类型，自动处理为 OR 或 HR
+#'
 #' @param x 模型自变量
 #' @param y 因变量
 #' @param model 模型名称；默认 model
@@ -15,7 +17,11 @@
 #' @examples
 extract_model_results_conf <- function(x, y, model = model, results = results) {
   # 提取模型系数
-  model_summary <- broom.mixed::tidy(model, conf.int = TRUE)
+  model_summary <- summary(model)$coefficients
+  model_summary <- as.data.frame(model_summary) %>% tibble::rownames_to_column(var = "term")
+
+
+
   model_summary <- cbind(y, model_summary)
   model_summary <- model_summary[grepl(x, model_summary$term), ]
   names(model_summary)[names(model_summary)=='term'] <- 'x'
@@ -28,6 +34,39 @@ extract_model_results_conf <- function(x, y, model = model, results = results) {
   # 合并结果
   res <- cbind(model_summary, model_confint)
 
+  # 判断是否需要取指数（exp(β)）
+  need_exp <- FALSE
+
+  # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
+  if (inherits(model, "glm") && model$family$family == "binomial") {
+    need_exp <- TRUE
+  }
+
+  # 情况2：模型是Cox回归 → 计算HR
+  if (inherits(model, "coxph")) {
+    need_exp <- TRUE
+  }
+
+  # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
+  dep_var <- all.vars(formula(model))[1]
+  dep_data <- model.frame(model)[[dep_var]]
+  if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
+    need_exp <- TRUE
+  }
+
+
+  # 如果需要exp(β)，转换系数和置信区间
+  if (need_exp) {
+    res <- res %>%
+      mutate(
+        estimate = exp(estimate),
+        conf.low = exp(conf.low),
+        conf.high = exp(conf.high),
+        `2.5 %` = exp(`2.5 %`),
+        `97.5 %` = exp(`97.5 %`)
+      )
+  }
+
   # 合并到 results
   if (is.data.frame(results)) {
     results <- bind_rows(results, res)
@@ -38,12 +77,72 @@ extract_model_results_conf <- function(x, y, model = model, results = results) {
   # 返回结果
   return(results)
 }
+# extract_model_results_conf <- function(x, y, model = model, results = results) {
+#   # 提取模型系数
+#   model_summary <- broom.mixed::tidy(model, conf.int = TRUE)
+#   model_summary <- cbind(y, model_summary)
+#   model_summary <- model_summary[grepl(x, model_summary$term), ]
+#   names(model_summary)[names(model_summary)=='term'] <- 'x'
+#
+#   # 提取模型通过 bootstrap 得到的置信区间
+#   model_confint <- confint(model)
+#   model_confint <- as.data.frame(model_confint)
+#   model_confint <- model_confint[grepl(x, rownames(model_confint)),]
+#
+#   # 合并结果
+#   res <- cbind(model_summary, model_confint)
+#
+#   # 判断是否需要取指数（exp(β)）
+#   need_exp <- FALSE
+#
+#   # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
+#   if (inherits(model, "glm") && model$family$family == "binomial") {
+#     need_exp <- TRUE
+#   }
+#
+#   # 情况2：模型是Cox回归 → 计算HR
+#   if (inherits(model, "coxph")) {
+#     need_exp <- TRUE
+#   }
+#
+#   # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
+#   dep_var <- all.vars(formula(model))[1]
+#   dep_data <- model.frame(model)[[dep_var]]
+#   if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
+#     need_exp <- TRUE
+#   }
+#
+#
+#   # 如果需要exp(β)，转换系数和置信区间
+#   if (need_exp) {
+#     res <- res %>%
+#       mutate(
+#         estimate = exp(estimate),
+#         conf.low = exp(conf.low),
+#         conf.high = exp(conf.high),
+#         `2.5 %` = exp(`2.5 %`),
+#         `97.5 %` = exp(`97.5 %`)
+#       )
+#   }
+#
+#   # 合并到 results
+#   if (is.data.frame(results)) {
+#     results <- bind_rows(results, res)
+#   } else {
+#     results <- data.frame()
+#     results <- bind_rows(results, res)
+#   }
+#   # 返回结果
+#   return(results)
+# }
 
 
 
 #' 提取模型结果-用 broom 默认方式计算置信区间
 #'
-#' 提取模型的结果，包括 β、sd、confint等等。该函数使用 broom 计算置信区间，即直接使用 β±sd 的方式，耗时较短
+#' 提取模型的结果，包括 β、sd、confint等等。该函数使用 broom 计算置信区间，即直接使用 β±sd 的方式，耗时较短。
+#'
+#' 该函数还可根据因变量类型，自动处理为 OR 或 HR
 #'
 #' @param x 模型自变量
 #' @param y 因变量
@@ -55,11 +154,47 @@ extract_model_results_conf <- function(x, y, model = model, results = results) {
 #'
 #' @examples
 extract_model_results_tidy <- function(x, y, model = model, results = results) {
-  # 提取模型系数
-  model_summary <- broom.mixed::tidy(model, conf.int = TRUE)
+  # 提取模型系数（使用broom或broom.mixed）
+  print(paste0(Sys.time(),'-- 开始 ', model, ' 提取模型结果'))
+  model_summary <- broom::tidy(model, conf.int = TRUE)
+  print(paste0(Sys.time(),'-- 开始 ', model, ' 提取模型结果'))
+
+  # 判断是否需要取指数（exp(β)）
+  need_exp <- FALSE
+
+  # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
+  if (inherits(model, "glm") && model$family$family == "binomial") {
+    need_exp <- TRUE
+  }
+
+  # 情况2：模型是Cox回归 → 计算HR
+  if (inherits(model, "coxph")) {
+    need_exp <- TRUE
+  }
+
+  # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
+  dep_var <- all.vars(formula(model))[1]
+  dep_data <- model.frame(model)[[dep_var]]
+  if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
+    need_exp <- TRUE
+  }
+
+
+  # 保留与自变量x相关的行（匹配x或x的分组变量名）
   model_summary <- cbind(y, model_summary)
   model_summary <- model_summary[grepl(x, model_summary$term), ]
   names(model_summary)[names(model_summary)=='term'] <- 'x'
+
+
+  # 如果需要exp(β)，转换系数和置信区间
+  if (need_exp) {
+    model_summary <- model_summary %>%
+      mutate(
+        estimate = exp(estimate),
+        conf.low = exp(conf.low),
+        conf.high = exp(conf.high)
+      )
+  }
 
   if (is.data.frame(results)) {
     results <- bind_rows(results, model_summary)
@@ -70,6 +205,25 @@ extract_model_results_tidy <- function(x, y, model = model, results = results) {
   # 返回结果
   return(results)
 }
+# extract_model_results_tidy <- function(x, y, model = model, results = results) {
+#   # 提取模型系数
+#   model_summary <- broom.mixed::tidy(model, conf.int = TRUE)
+#   model_summary <- cbind(y, model_summary)
+#   model_summary <- model_summary[grepl(x, model_summary$term), ]
+#   names(model_summary)[names(model_summary)=='term'] <- 'x'
+#
+#   if (is.data.frame(results)) {
+#     results <- bind_rows(results, model_summary)
+#   } else {
+#     results <- data.frame()
+#     results <- bind_rows(results, model_summary)
+#   }
+#   # 返回结果
+#   return(results)
+# }
+
+
+
 
 
 
@@ -864,7 +1018,7 @@ handle_outliers <- function(x,
 
 
 
-#' 回归分析
+#' 回归分析（自变量为连续型）
 #'
 #' 可以循环自变量和因变量并按一般格式提取结果
 #'
@@ -892,7 +1046,7 @@ handle_outliers <- function(x,
 #'
 #' @examples
 #' # 线性回归（默认）
-#' out <- run_regression_analysis(df = all,
+#' out <- run_continuous_regression(df = all,
 #'                                x_vars = c("wbc","neuc"),
 #'                                y_vars = c("fev1","fvc"),
 #'                                covariates = c("age","sex","height"),
@@ -900,7 +1054,7 @@ handle_outliers <- function(x,
 #'                                file = "~/exp_lm.xlsx")
 #'
 #' # 广义线性回归（比如 logistic 回归）
-#' out <- run_regression_analysis(df = all,
+#' out <- run_continuous_regression(df = all,
 #'                                x_vars = c("wbc","neuc"),
 #'                                y_vars = c("disease"),
 #'                                covariates = c("age","sex","height"),
@@ -910,7 +1064,7 @@ handle_outliers <- function(x,
 #'                                model_args = list(family = binomial))
 #'
 #' # 混合效应模型（lme4::lmer）
-#' out <- run_regression_analysis(df = all,
+#' out <- run_continuous_regression(df = all,
 #'                                x_vars = c("wbc"),
 #'                                y_vars = c("fev1"),
 #'                                covariates = c("nl","xb","sg"),
@@ -918,7 +1072,7 @@ handle_outliers <- function(x,
 #'                                file = "~/opp_lmer.xlsx",
 #'                                model_fun = lme4::lmer,
 #'                                model_args = list(REML = FALSE))
-run_regression_analysis <- function(data = all,
+run_continuous_regression <- function(data = all,
                                     x_vars,
                                     y_vars,
                                     covariates,
@@ -992,6 +1146,90 @@ run_regression_analysis <- function(data = all,
               results_plot = results_plot,
               results = results))
 }
+
+
+
+
+
+#' 回归分析（自变量为分类型）
+#'
+#' 可以循环自变量和因变量并按一般格式提取结果
+#'
+#' 该函数会执行以下操作：
+#'
+#' 1、遍历 x（暴露）和 y（结局）
+#'
+#' 2、提取结果；
+#'
+#' 3、整理成 Sheet1 (常用格式) ; Sheet2 (画图格式); Sheet3 (原始格式)
+#'
+#' 4、输出 Excel
+#'
+#' @param data 传入的数据框；默认为 all
+#' @param x_vars 自变量向量
+#' @param y_vars 因变量项量
+#' @param covariates 协变量项量
+#' @param file 结果输出文件
+#' @param model_fun 模型名；默认 lm 模型，可改为 glm, lmer 等
+#' @param model_args 额外传递给模型的参数
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+run_categorical_regression <- function(data = all,
+                                       x_vars,
+                                       y_vars,
+                                       covariates,
+                                       file = NULL,
+                                       model_fun = lm,
+                                       model_args = list()) {
+  results <- data.frame()
+
+  for (x in x_vars) {
+    for (y in y_vars) {
+      df <- data
+
+      # 确保自变量是因子类型
+      if (!is.factor(df[[x]])) {
+        df[[x]] <- as.factor(df[[x]])
+      }
+
+      # 运行回归模型
+      formula <- as.formula(paste0(y, '~', x, "+", paste(covariates, collapse = "+")))
+      model <- do.call(model_fun, c(list(formula, data = df), model_args))
+
+      # 提取结果
+      results <- extract_model_results_tidy(x, y, model, results)
+    }
+  }
+
+  # 格式化结果
+  results$beta_CI_tidy <- sprintf("%.2f (%.2f, %.2f)",
+                                  results$estimate, results$conf.low, results$conf.high)
+  results <- results %>%
+    dplyr::mutate(p.value3 = ifelse(p.value < 0.001, "<0.001", round(p.value, 3)))
+
+  # 整理宽表
+  results_data <- results[, c('x', 'y', 'beta_CI_tidy', 'p.value3')]
+  results_plot <- results[, c('x', 'y', 'estimate', 'conf.low', 'conf.high', 'p.value3')]
+
+  # 导出
+  if (!is.null(file)) {
+    write_xlsx(list(Sheet1 = results_data,
+                    Sheet2 = results_plot,
+                    Sheet3 = results),
+               file = file)
+  }
+
+  return(list(results_data = results_data,
+              results_plot = results_plot,
+              results = results))
+}
+
+
+
+
 
 
 
