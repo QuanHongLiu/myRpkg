@@ -5,7 +5,7 @@
 \title{回归分析（自变量为连续型）}
 \usage{
 run_continuous_regression(
-  data = all,
+  data = NULL,
   x_vars,
   y_vars,
   covariates,
@@ -51,7 +51,7 @@ run_continuous_regression(
 }
 \examples{
 # 线性回归（默认）
-out <- run_continuous_regression(df = all,
+out <- run_continuous_regression(data = all,
                                x_vars = c("wbc","neuc"),
                                y_vars = c("fev1","fvc"),
                                covariates = c("age","sex","height"),
@@ -59,22 +59,24 @@ out <- run_continuous_regression(df = all,
                                file = "~/exp_lm.xlsx")
 
 # 广义线性回归（比如 logistic 回归）
-out <- run_continuous_regression(df = all,
+out <- run_continuous_regression(data = all,
                                x_vars = c("wbc","neuc"),
                                y_vars = c("disease"),
                                covariates = c("age","sex","height"),
                                n = 4,
                                file = "~/exp_glm.xlsx",
                                model_fun = glm,
-                               model_args = list(family = binomial))
+                               model_args = list(family = binomial),
+                               extract_fun = extract_model_results_conf)
 
 # 混合效应模型（lme4::lmer）
-out <- run_continuous_regression(df = all,
+out <- run_continuous_regression(data = all,
                                x_vars = c("wbc"),
                                y_vars = c("fev1"),
                                covariates = c("nl","xb","sg"),
                                n = 4,
                                file = "~/opp_lmer.xlsx",
                                model_fun = lme4::lmer,
-                               model_args = list(REML = FALSE))
+                               model_args = list(REML = FALSE),
+                               extract_fun = extract_model_results_wald)
 }

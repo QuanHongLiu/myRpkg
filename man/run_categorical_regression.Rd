@@ -5,7 +5,7 @@
 \title{回归分析（自变量为分类型）}
 \usage{
 run_categorical_regression(
-  data = all,
+  data = NULL,
   x_vars,
   y_vars,
   covariates,
@@ -24,7 +24,7 @@ run_categorical_regression(
 
 \item{covariates}{协变量项量}
 
-\item{file}{结果输出文件}
+\item{file}{结果输出文件; 以 .xlsx 结尾}
 
 \item{model_fun}{模型名；默认 lm 模型，可改为 glm, lmer 等}
 
@@ -45,4 +45,8 @@ run_categorical_regression(
 3、整理成 Sheet1 (常用格式) ; Sheet2 (画图格式); Sheet3 (原始格式)
 
 4、输出 Excel
+
+注意！！！
+
+如果结局为 surv 变量，必须有个事件和时间；如 diabetes_surv, 则需要有个 diabetes_event2, diabetes_time
 }

@@ -4,7 +4,7 @@
 \alias{extract_model_results_wald}
 \title{提取模型结果-用 wald 法计算置信区间}
 \usage{
-extract_model_results_wald(x, y, model = model, results = results)
+extract_model_results_wald(x, y, model = model, results = results, data = NULL)
 }
 \arguments{
 \item{x}{模型自变量}
@@ -14,6 +14,8 @@ extract_model_results_wald(x, y, model = model, results = results)
 \item{model}{模型名称；默认 model}
 
 \item{results}{收纳结果的数据框；默认 results}
+
+\item{data}{原始数据框，用给结果添加些额外内容}
 }
 \value{
 结果的数据框

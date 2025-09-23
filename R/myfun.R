@@ -1,4 +1,115 @@
 
+#' 根据模型和自变量及因变量类型，给结果添加内容
+#'
+#' @param model_summary 需要添加内容的 summary 数据
+#' @param model 模型
+#' @param data 原始数据，用来给结果添加内容
+#' @param x 自变量
+#' @param y 因变量
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+add_model_info <- function(model_summary,
+                           model,
+                           data,
+                           x,
+                           y) {
+  # 小工具：提取前缀
+  get_prefix <- function(var) strsplit(var, "_")[[1]][1]
+  exp_model_type = needs_exp(model)
+
+  # ---- 情况 1: x 分类 + y 分类 ----
+  if (exp_model_type$exponentiate & x %in% names(model$xlevels)) {
+    print('add_model_info  情况 1: x 分类 + y 分类--------------')
+    # 添加 reference 行
+    df_ref <- data.frame(
+      x = paste0(x,'0.0'), y = y,
+      estimate = 1, conf.low = 1, conf.high = 1
+    )
+
+    model_summary <- model_summary %>%
+      mutate(
+        estimate = exp(estimate),
+        conf.low = exp(conf.low),
+        conf.high = exp(conf.high)
+      ) %>%
+      bind_rows(df_ref, .)
+
+    # 针对 Cox 回归
+    if (exp_model_type$model_type == 'coxph') {
+      var_prefix <- get_prefix(y)
+      event_var <- paste0(var_prefix, "_event2")
+      time_var  <- paste0(var_prefix, "_time")
+
+      if (event_var %in% names(data)) {
+        tab <- as.data.frame.matrix(table(data[[x]], data[[event_var]]))
+        model_summary$case    <- tab[,2]
+        model_summary$control <- tab[,1]
+      }
+      if (time_var %in% names(data)) {
+        model_summary$person_years <- as.data.frame(
+          tapply(data[[time_var]], data[[x]], sum, na.rm = TRUE)
+        )[,1]
+      }
+    }
+
+    # 针对 Logistic 回归
+    else if (exp_model_type$model_type == 'binomial') {
+      tab <- as.data.frame.matrix(table(data[[x]], data[[y]]))
+      model_summary$case    <- tab[,2]
+      model_summary$control <- tab[,1]
+    }
+  }
+
+  # ---- 情况 2: x 分类 + y 连续 ----
+  else if (!exp_model_type$exponentiate & x %in% names(model$xlevels)) {
+    print('add_model_info 情况 2: x 分类 + y 连续 --------------')
+    df_ref <- data.frame(
+      x = paste0(x,'0.0'), y = y,
+      estimate = 0, conf.low = 0, conf.high = 0
+    )
+    model_summary <- bind_rows(df_ref, model_summary)
+  }
+
+  # ---- 情况 3: x 连续 + y 分类 ----
+  else if (exp_model_type$exponentiate & !(x %in% names(model$xlevels))) {
+    print('add_model_info 情况 3: x 连续 + y 分类 --------------')
+    var_prefix <- get_prefix(y)
+
+    model_summary <- model_summary %>%
+      mutate(
+        estimate = exp(estimate),
+        conf.low = exp(conf.low),
+        conf.high = exp(conf.high)
+      )
+
+    # 针对 Cox 回归
+    if (exp_model_type$model_type == 'coxph') {
+      event_var <- paste0(var_prefix, "_event2")
+      time_var  <- paste0(var_prefix, "_time")
+
+      if (event_var %in% names(data)) {
+        tab <- as.data.frame(table(data[[event_var]]))
+        model_summary$case    <- tab[2,2]   # y==1
+        model_summary$control <- tab[1,2]   # y==0
+      }
+      if (time_var %in% names(data)) {
+        model_summary$person_years <- sum(data[[time_var]], na.rm = TRUE)
+      }
+    }
+
+    # 针对 Logistic 回归
+    else if (exp_model_type$model_type == 'binomial') {
+      tab <- as.data.frame(table(data[[y]]))
+      model_summary$case    <- tab[2,2]
+      model_summary$control <- tab[1,2]
+    }
+  }
+
+  return(model_summary)
+}
 
 
 
@@ -14,8 +125,8 @@ standardize_tidy_names <- function(df) {
   # 定义匹配规则（关键词->目标列名）
   name_map <- list(
     estimate   = c("estimate", "est", "coef", "coefficient"),
-    std.error  = c("std.error", "se", "standard error", "std error", 'Std. Error'),
-    statistic  = c("t value", "z value", "f value", "statistic", "t.value", "z.value"),
+    std.error  = c("std.error", "se", "standard error", "std error", 'Std. Error', 'se(coef)'),
+    statistic  = c("t value", "z value", "f value", "statistic", "t.value", "z.value",'z'),
     p.value    = c("p.value", "pvalue", "p_value", "Pr(>|z|)", "Pr(>|t|)"),
     conf.low   = c("2.5 %", "conf.low", "lower", "CI_low"),
     conf.high  = c("97.5 %", "conf.high", "upper", "CI_high")
@@ -40,6 +151,73 @@ standardize_tidy_names <- function(df) {
 
 
 
+#' 判断模型系数是否需要取指数（exp(β)）
+#'
+#' @param model 拟合的模型对象（如glm, coxph等）
+#'
+#' @returns 逻辑值（TRUE需要取指数，FALSE不需要）
+#' @export
+#'
+#' @examples
+needs_exp <- function(model) {
+  # 初始化结果列表
+  result <- list(
+    exponentiate = FALSE,
+    model_type = "unknown"
+  )
+
+  # 逻辑回归 → 计算OR
+  if (inherits(model, "glm") && model$family$family == "binomial") {
+    result$exponentiate <- TRUE
+    result$model_type <- "binomial"
+    return(result)
+  }
+
+  # 泊松回归 → 计算IRR
+  if (inherits(model, "glm") && model$family$family == "poisson") {
+    result$exponentiate <- TRUE
+    result$model_type <- "poisson"
+    return(result)
+  }
+
+  # Cox回归 → 计算HR
+  if (inherits(model, "coxph")) {
+    result$exponentiate <- TRUE
+    result$model_type <- "coxph"
+    return(result)
+  }
+
+  # 多项逻辑回归 → 计算OR
+  if (inherits(model, "multinom")) {
+    result$exponentiate <- TRUE
+    result$model_type <- "multinomial logistic regression"
+    return(result)
+  }
+
+  # 有序逻辑回归 → 计算OR
+  if (inherits(model, "polr")) {
+    result$exponentiate <- TRUE
+    result$model_type <- "ordinal logistic regression"
+    return(result)
+  }
+
+  # 线性回归
+  if (inherits(model, "lm") && !inherits(model, "glm")) {
+    exponentiate = FALSE
+    result$model_type <- "lm"
+    return(result)
+  }
+
+  # 其他情况
+  result$model_type <- class(model)
+  return(result)
+}
+
+
+
+
+
+
 
 #' 提取模型结果 confint 计算置信区间
 #'
@@ -51,28 +229,15 @@ standardize_tidy_names <- function(df) {
 #' @param y 因变量
 #' @param model 模型名称；默认 model
 #' @param results 收纳结果的数据框；默认 results
+#' @param data 原始数据框，用给结果添加些额外内容
 #'
 #' @return 结果的数据框
 #' @export
 #'
 #' @examples
-extract_model_results_conf <- function(x, y, model = model, results = results) {
+extract_model_results_conf <- function(x, y, model = model, results = results, data = NULL) {
   # 判断是否需要取指数（exp(β)）
-  exponentiate <- FALSE
-  # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
-  if (inherits(model, "glm") && model$family$family == "binomial") {
-    exponentiate <- TRUE
-  }
-  # 情况2：模型是Cox回归 → 计算HR
-  if (inherits(model, "coxph")) {
-    exponentiate <- TRUE
-  }
-  # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
-  dep_var <- all.vars(formula(model))[1]
-  dep_data <- model.frame(model)[[dep_var]]
-  if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
-    exponentiate <- TRUE
-  }
+  exponentiate <- needs_exp(model)$exponentiate
 
   # 提取模型系数
   model_summary <- summary(model)$coefficients
@@ -89,15 +254,12 @@ extract_model_results_conf <- function(x, y, model = model, results = results) {
   res <- cbind(model_summary, model_confint)
   res <- standardize_tidy_names(res)
 
-  # 如果需要exp(β)，转换系数和置信区间
-  if (exponentiate) {
-    res <- res %>%
-      mutate(
-        estimate = exp(estimate),
-        conf.low = exp(conf.low),
-        conf.high = exp(conf.high)
-      )
-  }
+  # 如果需要exp(β)，转换系数和置信区间; 如果 x 是level 也要; 还可以用于添加case，control，person-years
+  res <- add_model_info(model_summary = res,
+                                  model = model,
+                                  data = data,
+                                  x = x,
+                                  y = y)
 
   # 合并到 results
   if (is.data.frame(results)) {
@@ -111,21 +273,7 @@ extract_model_results_conf <- function(x, y, model = model, results = results) {
 }
 # extract_model_results_conf <- function(x, y, model = model, results = results) {
 #   # 判断是否需要取指数（exp(β)）
-#   exponentiate <- FALSE
-#   # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
-#   if (inherits(model, "glm") && model$family$family == "binomial") {
-#     exponentiate <- TRUE
-#   }
-#   # 情况2：模型是Cox回归 → 计算HR
-#   if (inherits(model, "coxph")) {
-#     exponentiate <- TRUE
-#   }
-#   # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
-#   dep_var <- all.vars(formula(model))[1]
-#   dep_data <- model.frame(model)[[dep_var]]
-#   if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
-#     exponentiate <- TRUE
-#   }
+#   exponentiate <- needs_exp(model)$exponentiate
 #
 #   # 提取模型系数
 #   model_summary <- broom.mixed::tidy(model, conf.int = FALSE, exponentiate = exponentiate)
@@ -165,29 +313,13 @@ extract_model_results_conf <- function(x, y, model = model, results = results) {
 #' @param y 因变量
 #' @param model 模型名称；默认 model
 #' @param results 收纳结果的数据框；默认 results
+#' @param data 原始数据框，用给结果添加些额外内容
 #'
 #' @return 结果的数据框
 #' @export
 #'
 #' @examples
-extract_model_results_wald <- function(x, y, model = model, results = results) {
-  # 判断是否需要取指数（exp(β))
-  exponentiate <- FALSE
-  # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
-  if (inherits(model, "glm") && model$family$family == "binomial") {
-    exponentiate <- TRUE
-  }
-  # 情况2：模型是Cox回归 → 计算HR
-  if (inherits(model, "coxph")) {
-    exponentiate <- TRUE
-  }
-  # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
-  dep_var <- all.vars(formula(model))[1]
-  dep_data <- model.frame(model)[[dep_var]]
-  if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
-    exponentiate <- TRUE
-  }
-
+extract_model_results_wald <- function(x, y, model = model, results = results, data = NULL) {
   # 提取模型系数
   model_summary <- summary(model)$coefficients
   model_summary <- as.data.frame(model_summary) %>% tibble::rownames_to_column(var = "x")
@@ -199,16 +331,14 @@ extract_model_results_wald <- function(x, y, model = model, results = results) {
   model_summary$conf.low <- model_summary$estimate - 1.96 * model_summary$std.error
   model_summary$conf.high <- model_summary$estimate + 1.96 * model_summary$std.error
 
-  # 如果需要exp(β)，转换系数和置信区间
-  if (exponentiate) {
-    model_summary <- model_summary %>%
-      mutate(
-        estimate = exp(estimate),
-        conf.low = exp(conf.low),
-        conf.high = exp(conf.high)
-      )
-  }
+  # 如果需要exp(β)，转换系数和置信区间; 如果 x 是level 也要; 还可以用于添加case，control，person-years
+  model_summary <- add_model_info(model_summary = model_summary,
+                                  model = model,
+                                  data = data,
+                                  x = x,
+                                  y = y)
 
+  # 合并到 results
   if (is.data.frame(results)) {
     results <- bind_rows(results, model_summary)
   } else {
@@ -220,21 +350,7 @@ extract_model_results_wald <- function(x, y, model = model, results = results) {
 }
 # extract_model_results_tidy <- function(x, y, model = model, results = results) {
 #   # 判断是否需要取指数（exp(β)）
-#   exponentiate <- FALSE
-#   # 情况1：模型是逻辑回归（family = binomial）→ 计算OR
-#   if (inherits(model, "glm") && model$family$family == "binomial") {
-#     exponentiate <- TRUE
-#   }
-#   # 情况2：模型是Cox回归 → 计算HR
-#   if (inherits(model, "coxph")) {
-#     exponentiate <- TRUE
-#   }
-#   # 情况3：因变量是因子且多分类 → 可能需要OR（如多项逻辑回归）
-#   dep_var <- all.vars(formula(model))[1]
-#   dep_data <- model.frame(model)[[dep_var]]
-#   if (is.factor(dep_data) && nlevels(dep_data) > 2 && inherits(model, "multinom")) {
-#     exponentiate <- TRUE
-#   }
+#   exponentiate <- needs_exp(model)$exponentiate
 #
 #   # 提取模型系数
 #   model_summary <- broom.mixed::tidy(model, conf.int = TRUE, exponentiate = exponentiate)
@@ -1077,7 +1193,7 @@ handle_outliers <- function(x,
 #'
 #' @examples
 #' # 线性回归（默认）
-#' out <- run_continuous_regression(df = all,
+#' out <- run_continuous_regression(data = all,
 #'                                x_vars = c("wbc","neuc"),
 #'                                y_vars = c("fev1","fvc"),
 #'                                covariates = c("age","sex","height"),
@@ -1085,58 +1201,59 @@ handle_outliers <- function(x,
 #'                                file = "~/exp_lm.xlsx")
 #'
 #' # 广义线性回归（比如 logistic 回归）
-#' out <- run_continuous_regression(df = all,
+#' out <- run_continuous_regression(data = all,
 #'                                x_vars = c("wbc","neuc"),
 #'                                y_vars = c("disease"),
 #'                                covariates = c("age","sex","height"),
 #'                                n = 4,
 #'                                file = "~/exp_glm.xlsx",
 #'                                model_fun = glm,
-#'                                model_args = list(family = binomial))
+#'                                model_args = list(family = binomial),
+#'                                extract_fun = extract_model_results_conf)
 #'
 #' # 混合效应模型（lme4::lmer）
-#' out <- run_continuous_regression(df = all,
+#' out <- run_continuous_regression(data = all,
 #'                                x_vars = c("wbc"),
 #'                                y_vars = c("fev1"),
 #'                                covariates = c("nl","xb","sg"),
 #'                                n = 4,
 #'                                file = "~/opp_lmer.xlsx",
 #'                                model_fun = lme4::lmer,
-#'                                model_args = list(REML = FALSE))
-run_continuous_regression <- function(data = all,
-                                    x_vars,
-                                    y_vars,
-                                    covariates,
-                                    n = 4,
-                                    file = NULL,
-                                    model_fun = lm,
-                                    model_args = list(),
-                                    extract_fun = extract_model_results_wald) {
+#'                                model_args = list(REML = FALSE),
+#'                                extract_fun = extract_model_results_wald)
+run_continuous_regression <- function(data = NULL,
+                                      x_vars,
+                                      y_vars,
+                                      covariates,
+                                      n = 4,
+                                      file = NULL,
+                                      model_fun = lm,
+                                      model_args = list(),
+                                      extract_fun = extract_model_results_wald) {
   results <- data.frame()
 
   for (x in x_vars) {
     for (y in y_vars) {
       # 过程显示
       print(paste0(Sys.time(),' -- 开始 自变量：', x,' 因变量：',y))
-      df <- data
-      df <- quartile_cut(df, x, n)
+      data <- quartile_cut(data, x, n)
 
       # 连续 x
       formula <- as.formula(paste0(y,'~',x,"+", paste(covariates, collapse = "+")))
-      model <- do.call(model_fun, c(list(formula, data = df), model_args))
-      results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results))
+      model <- do.call(model_fun, c(list(formula, data = data), model_args))
+      results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results, data = data))
 
       # 分类 x
       formula <- as.formula(paste0(y,'~',x,n,"+", paste(covariates, collapse = "+")))
-      model <- do.call(model_fun, c(list(formula, data = df), model_args))
-      results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results))
+      model <- do.call(model_fun, c(list(formula, data = data), model_args))
+      results <- do.call(extract_fun, list(x = paste0(x,n), y = y, model = model, results = results, data = data))
 
       # P for trend
-      df[[paste0(x,n)]] <- as.numeric(df[[paste0(x,n)]])
+      data[[paste0(x,n)]] <- as.numeric(data[[paste0(x,n)]])
       formula <- as.formula(paste0(y,'~',x,n,"+", paste(covariates, collapse = "+")))
-      model <- do.call(model_fun, c(list(formula, data = df), model_args))
-      results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results))
-      df[[paste0(x,n)]] <- as.factor(df[[paste0(x,n)]])
+      model <- do.call(model_fun, c(list(formula, data = data), model_args))
+      results <- do.call(extract_fun, list(x = paste0(x,n), y = y, model = model, results = results, data = data))
+      data[[paste0(x,n)]] <- as.factor(data[[paste0(x,n)]])
     }
   }
 
@@ -1147,26 +1264,24 @@ run_continuous_regression <- function(data = all,
     dplyr::mutate(p.value3 = ifelse(p.value < 0.001, "<0.001", round(p.value, 3)))
 
   # 整理宽表
-  results_data <- results[,c('x','y','beta_CI_tidy','p.value3')]
-  results_plot <- results[,c('x','y','estimate','conf.low','conf.high','p.value3')]
+  results_data <- dplyr::select(results, any_of(c("x", "y", "beta_CI_tidy", "p.value3",'case','control','person_years')))
+  results_plot <- dplyr::select(results, any_of(c("x", "y", 'estimate', 'conf.low', 'conf.high', 'p.value3','case','control','person_years')))
 
   raw_names_data <- names(results_data)
   raw_names_plot <- names(results_plot)
 
-  results_data <- as.data.frame(matrix(t(results_data), ncol = (n+1)*ncol(results_data), byrow = TRUE))
-  results_plot <- as.data.frame(matrix(t(results_plot), ncol = (n+1)*ncol(results_plot), byrow = TRUE))
+  results_data <- as.data.frame(matrix(t(results_data), ncol = (n+2)*ncol(results_data), byrow = TRUE))
+  results_plot <- as.data.frame(matrix(t(results_plot), ncol = (n+2)*ncol(results_plot), byrow = TRUE))
 
-  names(results_data) <- unlist(lapply(1:(n+1), function(i) paste(raw_names_data, i, sep = "_")))
-  names(results_plot) <- unlist(lapply(1:(n+1), function(i) paste(raw_names_plot, i, sep = "_")))
+  names(results_data) <- unlist(lapply(1:(n+2), function(i) paste(raw_names_data, i, sep = "_")))
+  names(results_plot) <- unlist(lapply(1:(n+2), function(i) paste(raw_names_plot, i, sep = "_")))
 
-  results_data$ref <- "0 (ref.)"
-  results_plot$ref <- "0 (ref.)"
 
-  results_data <- results_data[,c('x_1','y_1','beta_CI_tidy_1','p.value3_1','ref',
-                                  paste0("beta_CI_tidy_", 2:n), paste0("p.value3_", n+1))]
-  results_plot <- results_plot[,c('x_1','y_1','estimate_1','conf.low_1','conf.high_1','p.value3_1','ref',
-                                  as.vector(outer(c("estimate", "conf.low", "conf.high"), 2:n, paste, sep = "_")),
-                                  paste0("p.value3_", n+1))]
+  results_data <- dplyr::select(results_data, any_of(c('x_1','y_1','beta_CI_tidy_1','p.value3_1','beta_CI_tidy_2',
+                                                       paste0("beta_CI_tidy_", 3:(n+1)), paste0("p.value3_", n+2), 'case_1', 'control_1','person_years_1')))
+  results_plot <- dplyr::select(results_plot, any_of(c('x_1','y_1','estimate_1','conf.low_1','conf.high_1','p.value3_1','beta_CI_tidy_2',
+                                                       as.vector(outer(c("estimate", "conf.low", "conf.high"), 3:(n+1), paste, sep = "_")),
+                                                       paste0("p.value3_", n+2), 'case_1', 'control_1','person_years_1')))
 
   # 导出
   if (!is.null(file)) {
@@ -1180,6 +1295,7 @@ run_continuous_regression <- function(data = all,
               results_plot = results_plot,
               results = results))
 }
+
 
 
 
@@ -1199,11 +1315,15 @@ run_continuous_regression <- function(data = all,
 #'
 #' 4、输出 Excel
 #'
+#' 注意！！！
+#'
+#' 如果结局为 surv 变量，必须有个事件和时间；如 diabetes_surv, 则需要有个 diabetes_event2, diabetes_time
+#'
 #' @param data 传入的数据框；默认为 all
 #' @param x_vars 自变量向量
 #' @param y_vars 因变量项量
 #' @param covariates 协变量项量
-#' @param file 结果输出文件
+#' @param file 结果输出文件; 以 .xlsx 结尾
 #' @param model_fun 模型名；默认 lm 模型，可改为 glm, lmer 等
 #' @param model_args 额外传递给模型的参数
 #' @param extract_fun 提取模型结果时选用的函数方法；默认 extract_model_results_wald，还可选 extract_model_results_conf
@@ -1212,7 +1332,7 @@ run_continuous_regression <- function(data = all,
 #' @export
 #'
 #' @examples
-run_categorical_regression <- function(data = all,
+run_categorical_regression <- function(data = NULL,
                                        x_vars,
                                        y_vars,
                                        covariates,
@@ -1226,21 +1346,20 @@ run_categorical_regression <- function(data = all,
     for (y in y_vars) {
       # 过程显示
       print(paste0(Sys.time(),' -- 开始 自变量：', x,' 因变量：',y))
-      df <- data
 
       # 确保自变量是因子类型
-      if (!is.factor(df[[x]])) {
-        df[[x]] <- as.factor(df[[x]])
+      if (!is.factor(data[[x]])) {
+        data[[x]] <- as.factor(data[[x]])
       }
 
       # 运行回归模型
       formula <- as.formula(paste0(y, '~', x, "+", paste(covariates, collapse = "+")))
-      model <- do.call(model_fun, c(list(formula, data = df), model_args))
+      model <- do.call(model_fun, c(list(formula, data = data), model_args))
 
       # 提取结果
-      results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results))
+      results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results, data = data))
+      }
     }
-  }
 
   # 格式化结果
   results$beta_CI_tidy <- sprintf("%.2f (%.2f, %.2f)",
@@ -1249,8 +1368,8 @@ run_categorical_regression <- function(data = all,
     dplyr::mutate(p.value3 = ifelse(p.value < 0.001, "<0.001", round(p.value, 3)))
 
   # 整理宽表
-  results_data <- results[, c('x', 'y', 'beta_CI_tidy', 'p.value3')]
-  results_plot <- results[, c('x', 'y', 'estimate', 'conf.low', 'conf.high', 'p.value3')]
+  results_data <- dplyr::select(results, any_of(c("x", "y", "beta_CI_tidy", "p.value3",'case','control','person_years')))
+  results_plot <- dplyr::select(results, any_of(c("x", "y", 'estimate', 'conf.low', 'conf.high', 'p.value3','case','control','person_years')))
 
   # 导出
   if (!is.null(file)) {
@@ -1264,10 +1383,6 @@ run_categorical_regression <- function(data = all,
               results_plot = results_plot,
               results = results))
 }
-
-
-
-
 
 
 
