@@ -18,7 +18,7 @@ add_model_info <- function(model_summary,
                            y) {
   # 小工具：提取前缀
   get_prefix <- function(var) strsplit(var, "_")[[1]][1]
-  exp_model_type = needs_exp(model)
+  exp_model_type <- needs_exp(model)
 
   # ---- 情况 1: x 分类 + y 分类 ----
   if (exp_model_type$exponentiate & x %in% names(model$xlevels)) {
@@ -236,9 +236,6 @@ needs_exp <- function(model) {
 #'
 #' @examples
 extract_model_results_conf <- function(x, y, model = model, results = results, data = NULL) {
-  # 判断是否需要取指数（exp(β)）
-  exponentiate <- needs_exp(model)$exponentiate
-
   # 提取模型系数
   model_summary <- summary(model)$coefficients
   model_summary <- as.data.frame(model_summary) %>% tibble::rownames_to_column(var = "x")
@@ -1187,6 +1184,7 @@ handle_outliers <- function(x,
 #' @param model_fun 模型名；默认 lm 模型，可改为 glm, lmer 等
 #' @param model_args 额外传递给模型的参数
 #' @param extract_fun 提取模型结果时选用的函数方法；默认 extract_model_results_wald，还可选 extract_model_results_conf
+#' @param scale_x 是否对连续型模型的 x 去中心化
 #'
 #' @returns
 #' @export
@@ -1229,7 +1227,8 @@ run_continuous_regression <- function(data = NULL,
                                       file = NULL,
                                       model_fun = lm,
                                       model_args = list(),
-                                      extract_fun = extract_model_results_wald) {
+                                      extract_fun = extract_model_results_wald,
+                                      scale_x = FALSE) {
   results <- data.frame()
 
   for (x in x_vars) {
@@ -1237,6 +1236,9 @@ run_continuous_regression <- function(data = NULL,
       # 过程显示
       print(paste0(Sys.time(),' -- 开始 自变量：', x,' 因变量：',y))
       data <- quartile_cut(data, x, n)
+
+      # 标准化 x
+      if (scale_x) {data[[x]] <- scale(data[[x]])}
 
       # 连续 x
       formula <- as.formula(paste0(y,'~',x,"+", paste(covariates, collapse = "+")))
