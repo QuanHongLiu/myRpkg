@@ -17,7 +17,23 @@ add_model_info <- function(model_summary,
                            x,
                            y) {
   # 小工具：提取前缀
-  get_prefix <- function(var) strsplit(var, "_")[[1]][1]
+  get_prefix <- function(var) {
+    parts <- unlist(strsplit(var, "_"))  # 使用 unlist 将列表转换为向量
+
+    # 如果第一个部分是 "death"，则取下一个部分
+    if (parts[1] == "death") {
+      # 确保有下一个部分可用
+      if (length(parts) > 1) {
+        return(parts[2])
+      } else {
+        # 如果没有下一个部分，则返回空字符串或NA（根据需求选择）
+        return(NA)
+      }
+    } else {
+      # 否则返回第一个部分
+      return(parts[1])
+    }
+  }
   exp_model_type <- needs_exp(model)
 
   # ---- 情况 1: x 分类 + y 分类 ----
@@ -51,6 +67,20 @@ add_model_info <- function(model_summary,
       if (time_var %in% names(data)) {
         model_summary$person_years <- as.data.frame(
           tapply(data[[time_var]], data[[x]], sum, na.rm = TRUE)
+        )[,1]
+      }
+
+      event_var_death <- paste0('death_', var_prefix, "_event2")
+      time_var_death  <- paste0('death_', var_prefix, "_time")
+
+      if (event_var_death %in% names(data)) {
+        tab <- as.data.frame.matrix(table(data[[x]], data[[event_var_death]]))
+        model_summary$case    <- tab[,2]
+        model_summary$control <- tab[,1]
+      }
+      if (time_var_death %in% names(data)) {
+        model_summary$person_years <- as.data.frame(
+          tapply(data[[time_var_death]], data[[x]], sum, na.rm = TRUE)
         )[,1]
       }
     }
@@ -98,6 +128,19 @@ add_model_info <- function(model_summary,
       if (time_var %in% names(data)) {
         model_summary$person_years <- sum(data[[time_var]], na.rm = TRUE)
       }
+
+      event_var_death <- paste0('death_', var_prefix, "_event2")
+      time_var_death  <- paste0('death_', var_prefix, "_time")
+
+      if (event_var_death %in% names(data)) {
+        tab <- as.data.frame(table(data[[event_var_death]]))
+        model_summary$case    <- tab[2,2]   # y==1
+        model_summary$control <- tab[1,2]   # y==0
+      }
+      if (time_var_death %in% names(data)) {
+        model_summary$person_years <- sum(data[[time_var_death]], na.rm = TRUE)
+      }
+
     }
 
     # 针对 Logistic 回归
