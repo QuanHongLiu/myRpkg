@@ -14,7 +14,10 @@ run_continuous_regression(
   model_fun = lm,
   model_args = list(),
   extract_fun = extract_model_results_wald,
-  scale_x = FALSE
+  scale_x = FALSE,
+  font = "Times New Roman",
+  strata_var = NULL,
+  results = data.frame()
 )
 }
 \arguments{
@@ -26,7 +29,7 @@ run_continuous_regression(
 
 \item{covariates}{协变量项量}
 
-\item{n}{分类回归类别数；默认为 4}
+\item{n}{分类回归类别数；默认为 4; 如果为 0 则只做连续型模型}
 
 \item{file}{结果输出文件}
 
@@ -37,6 +40,12 @@ run_continuous_regression(
 \item{extract_fun}{提取模型结果时选用的函数方法；默认 extract_model_results_wald，还可选 extract_model_results_conf}
 
 \item{scale_x}{是否对连续型模型的 x 去中心化}
+
+\item{font}{输出 xlsx 时的字体；详见 write_xlsx 函数}
+
+\item{strata_var}{分层变量；默认 NULL, 即不分层}
+
+\item{results}{数据框；默认为一个空的数据框; 还可传入之前结果的 results, 以达到不同分层有不同协变量, 但结果又在同一个表格中}
 }
 \description{
 可以循环自变量和因变量并按一般格式提取结果
@@ -44,7 +53,7 @@ run_continuous_regression(
 \details{
 该函数会执行以下操作：
 
-1、遍历 x（暴露）和 y（结局），做连续 + 分类 + 趋势三种回归；
+1、遍历 x（暴露）和 y（结局），做连续 + 分类 + 趋势三种回归；如果 n = 0 只做连续型模型
 
 2、提取结果；
 
@@ -58,7 +67,7 @@ out <- run_continuous_regression(data = all,
                                x_vars = c("wbc","neuc"),
                                y_vars = c("fev1","fvc"),
                                covariates = c("age","sex","height"),
-                               n = 4,
+                               n = 0,
                                file = "~/exp_lm.xlsx")
 
 # 广义线性回归（比如 logistic 回归）

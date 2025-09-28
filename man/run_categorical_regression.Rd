@@ -12,7 +12,9 @@ run_categorical_regression(
   file = NULL,
   model_fun = lm,
   model_args = list(),
-  extract_fun = extract_model_results_wald
+  extract_fun = extract_model_results_wald,
+  strata_var = NULL,
+  results = data.frame()
 )
 }
 \arguments{
@@ -31,6 +33,10 @@ run_categorical_regression(
 \item{model_args}{额外传递给模型的参数}
 
 \item{extract_fun}{提取模型结果时选用的函数方法；默认 extract_model_results_wald，还可选 extract_model_results_conf}
+
+\item{strata_var}{分层变量；默认 NULL, 即不分层}
+
+\item{results}{数据框；默认为一个空的数据框; 还可传入之前结果的 results, 以达到不同分层有不同协变量, 但结果又在同一个表格中}
 }
 \description{
 可以循环自变量和因变量并按一般格式提取结果
