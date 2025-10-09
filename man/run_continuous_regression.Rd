@@ -25,9 +25,9 @@ run_continuous_regression(
 
 \item{x_vars}{自变量向量}
 
-\item{y_vars}{因变量项量}
+\item{y_vars}{因变量向量}
 
-\item{covariates}{协变量项量}
+\item{covariates}{协变量向量}
 
 \item{n}{分类回归类别数；默认为 4; 如果为 0 则只做连续型模型}
 

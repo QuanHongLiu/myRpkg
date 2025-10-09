@@ -11,7 +11,7 @@ generate_fieldids_code(
 )
 }
 \arguments{
-\item{input_vec}{用户输入的变量项量}
+\item{input_vec}{用户输入的变量向量}
 
 \item{ukb_data_dir}{ukb 原始数据的路径；默认 "~/rawdata/"}
 

@@ -12,9 +12,9 @@ get_death_causes_date(
 )
 }
 \arguments{
-\item{death_causes}{死亡原因字符串或项量；自定义死亡原因的名称}
+\item{death_causes}{死亡原因字符串或向量；自定义死亡原因的名称}
 
-\item{death_codes_list}{单个死亡原因 icd10 项量，或多个死亡原因 icd10 项量的 list}
+\item{death_codes_list}{单个死亡原因 icd10 向量，或多个死亡原因 icd10 向量的 list}
 
 \item{primary_secondary}{字符；是选择主要死亡原因 "primary"，还是次要死亡原因 "secondary"，或两者都选 "both"}
 

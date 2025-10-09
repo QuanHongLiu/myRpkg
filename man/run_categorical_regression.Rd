@@ -13,6 +13,7 @@ run_categorical_regression(
   model_fun = lm,
   model_args = list(),
   extract_fun = extract_model_results_wald,
+  font = "Times New Roman",
   strata_var = NULL,
   results = data.frame()
 )
@@ -22,9 +23,9 @@ run_categorical_regression(
 
 \item{x_vars}{自变量向量}
 
-\item{y_vars}{因变量项量}
+\item{y_vars}{因变量向量}
 
-\item{covariates}{协变量项量}
+\item{covariates}{协变量向量}
 
 \item{file}{结果输出文件; 以 .xlsx 结尾}
 
@@ -33,6 +34,8 @@ run_categorical_regression(
 \item{model_args}{额外传递给模型的参数}
 
 \item{extract_fun}{提取模型结果时选用的函数方法；默认 extract_model_results_wald，还可选 extract_model_results_conf}
+
+\item{font}{输出 xlsx 时的字体；详见 write_xlsx 函数}
 
 \item{strata_var}{分层变量；默认 NULL, 即不分层}
 

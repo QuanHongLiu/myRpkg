@@ -1,4 +1,50 @@
 
+#' 将数据框中分类变量的原始数字level变为labels记录的level
+#'
+#'
+#' @param df 需要处理的数据框
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+convert_labels_to_levels <- function(df) {
+  # 检查输入
+  if (!is.data.frame(df)) stop("输入必须是 data.frame")
+
+  for (colname in names(df)) {
+    x <- df[[colname]]
+    labs <- attr(x, "labels")
+
+    if (!is.null(labs)) {
+      # 保存旧属性
+      old_attrs <- attributes(x)
+
+      # 构造新的 factor
+      x <- factor(x,
+                  levels = as.character(labs),
+                  labels = names(labs))
+
+      # 恢复原属性（除了 levels / class / labels）
+      keep_attrs <- setdiff(names(old_attrs), c("levels", "class", "labels"))
+      for (a in keep_attrs) {
+        attr(x, a) <- old_attrs[[a]]
+      }
+
+      df[[colname]] <- x
+      message("✅ 转换变量: ", colname)
+    }
+  }
+  return(df)
+}
+
+
+
+
+
+
+
+
 #' 根据模型和自变量及因变量类型，给结果添加内容
 #'
 #' @param model_summary 需要添加内容的 summary 数据
@@ -978,7 +1024,7 @@ extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_pre
 #'
 #' 根据用户的英文变量，寻找 field id，并生成 R 脚本文件
 #'
-#' @param input_vec 用户输入的变量项量
+#' @param input_vec 用户输入的变量向量
 #' @param ukb_data_dir  ukb 原始数据的路径；默认 "~/rawdata/"
 #' @param output_dir_prefix 前处理数据的 source 的 R 脚本文件路径前缀
 #'
@@ -1225,8 +1271,8 @@ handle_outliers <- function(x,
 #'
 #' @param data 传入的数据框；默认为 all
 #' @param x_vars 自变量向量
-#' @param y_vars 因变量项量
-#' @param covariates 协变量项量
+#' @param y_vars 因变量向量
+#' @param covariates 协变量向量
 #' @param n 分类回归类别数；默认为 4; 如果为 0 则只做连续型模型
 #' @param file 结果输出文件
 #' @param model_fun 模型名；默认 lm 模型，可改为 glm, lmer 等
@@ -1286,7 +1332,7 @@ run_continuous_regression <- function(data = NULL,
 
   # 如果有分层变量
   if (!is.null(strata_var)) {
-    strata_levels <- unique(data[[strata_var]])
+    strata_levels <- levels(data[[strata_var]])
 
     for (x in x_vars) {
       for (y in y_vars) {
@@ -1350,7 +1396,7 @@ run_continuous_regression <- function(data = NULL,
           }
 
           # 添加分层信息
-          labels <- attr(data$sex, "labels")
+          labels <- attr(data[[strata_var]], "labels")
           label <- names(labels)[labels == index]
           tmp_results$strata_var <- paste0(index, ' - ',label)
           tmp_results$n_strata <- nrow(tmp_df)
@@ -1408,9 +1454,7 @@ run_continuous_regression <- function(data = NULL,
   raw_names_plot <- names(results_plot)
 
   # 重置 n
-  if (n == 0) {
-    n = -1
-  }
+  if (n == 0) {n = -1}
 
   results_data <- as.data.frame(matrix(t(results_data), ncol = (n+2)*ncol(results_data), byrow = TRUE))
   results_plot <- as.data.frame(matrix(t(results_plot), ncol = (n+2)*ncol(results_plot), byrow = TRUE))
@@ -1464,12 +1508,13 @@ run_continuous_regression <- function(data = NULL,
 #'
 #' @param data 传入的数据框；默认为 all
 #' @param x_vars 自变量向量
-#' @param y_vars 因变量项量
-#' @param covariates 协变量项量
+#' @param y_vars 因变量向量
+#' @param covariates 协变量向量
 #' @param file 结果输出文件; 以 .xlsx 结尾
 #' @param model_fun 模型名；默认 lm 模型，可改为 glm, lmer 等
 #' @param model_args 额外传递给模型的参数
 #' @param extract_fun 提取模型结果时选用的函数方法；默认 extract_model_results_wald，还可选 extract_model_results_conf
+#' @param font 输出 xlsx 时的字体；详见 write_xlsx 函数
 #' @param strata_var 分层变量；默认 NULL, 即不分层
 #' @param results 数据框；默认为一个空的数据框; 还可传入之前结果的 results, 以达到不同分层有不同协变量, 但结果又在同一个表格中
 #'
@@ -1485,18 +1530,19 @@ run_categorical_regression <- function(data = NULL,
                                        model_fun = lm,
                                        model_args = list(),
                                        extract_fun = extract_model_results_wald,
+                                       font = "Times New Roman",
                                        strata_var = NULL,
                                        results = data.frame()) {
 
   # 如果有分层变量
   if (!is.null(strata_var)) {
-    strata_levels <- unique(data[[strata_var]])
+    strata_levels <- levels(data[[strata_var]])
 
     for (x in x_vars) {
       for (y in y_vars) {
         for (index in strata_levels) {
           # 过程显示
-          print(paste0(Sys.time(),' -- 开始 自变量：', x,' 因变量：', y, ' 分层：', strata_var, '=', index))
+          print(paste0(Sys.time(),' -- 开始 自变量：', x,' 因变量：', y, ' 分层：', strata_var, ' = ', index))
 
           # 分层数据
           tmp_df <- data[data[[strata_var]] == index, ]
@@ -1514,6 +1560,13 @@ run_categorical_regression <- function(data = NULL,
           model <- do.call(model_fun, c(list(formula, data = tmp_df), model_args))
           tmp_results <- do.call(extract_fun, list(x = x, y = y, model = model, results = tmp_results, data = tmp_df))
 
+          # P for trend
+          data[[x]] <- as.numeric(data[[x]])
+          formula <- as.formula(paste0(y, '~', x, "+", paste(covariates, collapse = "+")))
+          model <- do.call(model_fun, c(list(formula, data = data), model_args))
+          tmp_results <- do.call(extract_fun, list(x = x, y = y, model = model, results = tmp_results, data = data))
+          data[[x]] <- as.factor(data[[x]])
+
           # p modification for factor
           origin_formula <- as.formula(paste0(y, '~', x, '*', strata_var, "+", paste(covariates, collapse = "+")))
           origin_model <- do.call(model_fun, c(list(origin_formula, data = data), model_args))
@@ -1526,7 +1579,9 @@ run_categorical_regression <- function(data = NULL,
           tmp_results$p_ff <- na.omit(anova_result$p.value)[1]
 
           # 添加分层信息
-          tmp_results[[strata_var]] <- index
+          labels <- attr(data[[strata_var]], "labels")
+          label <- names(labels)[labels == index]
+          tmp_results$strata_var <- paste0(index, ' - ',label)
           tmp_results$n_strata <- nrow(tmp_df)
 
           # 合并结果
@@ -1549,9 +1604,14 @@ run_categorical_regression <- function(data = NULL,
         # 运行回归模型
         formula <- as.formula(paste0(y, '~', x, "+", paste(covariates, collapse = "+")))
         model <- do.call(model_fun, c(list(formula, data = data), model_args))
-
-        # 提取结果
         results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results, data = data))
+
+        # P for trend
+        data[[x]] <- as.numeric(data[[x]])
+        formula <- as.formula(paste0(y, '~', x, "+", paste(covariates, collapse = "+")))
+        model <- do.call(model_fun, c(list(formula, data = data), model_args))
+        results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results, data = data))
+        data[[x]] <- as.factor(data[[x]])
       }
     }
   }
@@ -1562,8 +1622,8 @@ run_categorical_regression <- function(data = NULL,
   if ("p_ff" %in% colnames(results)) {results <- results %>% mutate(p_ff3 = ifelse(p_ff < 0.001, "<0.001", sprintf("%.3f", p_ff)))}
 
   # 整理宽表
-  results_data <- dplyr::select(results, any_of(c("x", "y", "beta_CI_tidy", "p.value3", 'case', 'control', 'person_years', "strata_var", "n_strata", "p_ff3")))
-  results_plot <- dplyr::select(results, any_of(c("x", "y", 'estimate', 'conf.low', 'conf.high', 'p.value3', 'case', 'control', 'person_years', "strata_var", "n_strata", "p_ff3")))
+  results_data <- dplyr::select(results, any_of(c("x", "y", "strata_var", "n_strata", "beta_CI_tidy", "p.value3", 'case', 'control', 'person_years', "p_ff3")))
+  results_plot <- dplyr::select(results, any_of(c("x", "y", "strata_var", "n_strata", 'estimate', 'conf.low', 'conf.high', 'p.value3', 'case', 'control', 'person_years', "p_ff3")))
 
 
   # 导出
@@ -1571,7 +1631,8 @@ run_categorical_regression <- function(data = NULL,
     write_xlsx(list(Sheet1 = results_data,
                     Sheet2 = results_plot,
                     Sheet3 = results),
-               file = file)
+               file = file,
+               font = font)
   }
 
   return(list(results_data = results_data,
@@ -1591,9 +1652,9 @@ run_categorical_regression <- function(data = NULL,
 #'
 #' 生成的变量名为 paste0(disease, '_first_date')。返回的结果为数据框。
 #'
-#' @param disease_names 疾病字符串或疾病项量；自定义某种疾病的名称
-#' @param disease_10_codes_list 单个疾病 icd10 项量，或多个疾病 icd10 项量的 list
-#' @param disease_9_codes_list 单个疾病 icd9 项量，或多个疾病 icd9 项量的 list
+#' @param disease_names 疾病字符串或疾病向量；自定义某种疾病的名称
+#' @param disease_10_codes_list 单个疾病 icd10 向量，或多个疾病 icd10 向量的 list
+#' @param disease_9_codes_list 单个疾病 icd9 向量，或多个疾病 icd9 向量的 list
 #' @param data 需要处理数据
 #'
 #' @returns 处理好的数据框
@@ -1689,8 +1750,8 @@ get_first_diseases_date <- function(disease_names,
 #'
 #' 提取 UKB 中某种死亡原因的死亡时间
 #'
-#' @param death_causes 死亡原因字符串或项量；自定义死亡原因的名称
-#' @param death_codes_list 单个死亡原因 icd10 项量，或多个死亡原因 icd10 项量的 list
+#' @param death_causes 死亡原因字符串或向量；自定义死亡原因的名称
+#' @param death_codes_list 单个死亡原因 icd10 向量，或多个死亡原因 icd10 向量的 list
 #' @param primary_secondary 字符；是选择主要死亡原因 "primary"，还是次要死亡原因 "secondary"，或两者都选 "both"
 #' @param data 需要处理数据
 #'

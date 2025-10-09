@@ -12,11 +12,11 @@ get_first_diseases_date(
 )
 }
 \arguments{
-\item{disease_names}{疾病字符串或疾病项量；自定义某种疾病的名称}
+\item{disease_names}{疾病字符串或疾病向量；自定义某种疾病的名称}
 
-\item{disease_10_codes_list}{单个疾病 icd10 项量，或多个疾病 icd10 项量的 list}
+\item{disease_10_codes_list}{单个疾病 icd10 向量，或多个疾病 icd10 向量的 list}
 
-\item{disease_9_codes_list}{单个疾病 icd9 项量，或多个疾病 icd9 项量的 list}
+\item{disease_9_codes_list}{单个疾病 icd9 向量，或多个疾病 icd9 向量的 list}
 
 \item{data}{需要处理数据}
 }
