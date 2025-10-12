@@ -24,33 +24,43 @@ jobs:
         with:
           r-version: ${{ matrix.config.r }}
 
-      - name: Query dependencies
+      - name: Setup dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
           cache-version: 2
           extra-packages: any::rcmdcheck
 
-      - name: Install Rtools (Windows)
+      # ✅ Windows only: Install Rtools (必要时)
+      - name: Install Rtools (Windows only)
         if: runner.os == 'Windows'
         run: |
-          choco install rtools -y
+          choco install rtools --no-progress -y
+          echo "RTOOLS40_HOME=C:\\rtools40" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PATH=${env:RTOOLS40_HOME}\\usr\\bin;${env:PATH}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      # ✅ Build & Check package
       - name: Build and check package
         env:
           _R_CHECK_CRAN_INCOMING_: false
         run: |
-          rcmdcheck::rcmdcheck(args = c("--no-manual", "--no-build-vignettes"), error_on = "error")
+          Rscript -e 'rcmdcheck::rcmdcheck(args = c("--no-manual", "--no-build-vignettes"), error_on = "error")'
 
-      - name: Build binary
+      # ✅ Build binary package (platform-dependent)
+      - name: Build binary package
         run: |
           R CMD INSTALL --build .
 
+      # ✅ Upload artifacts
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-binary
-          path: "*.zip;*.tgz;*.tar.gz"
+          path: |
+            *.zip
+            *.tgz
+            *.tar.gz
 
+  # ✅ Release stage: collect and publish all artifacts
   release:
     needs: build-r-package
     runs-on: ubuntu-latest
@@ -62,16 +72,10 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create Release
+      - name: Publish release
         uses: ncipollo/release-action@v1
         with:
-          token: ${{ secrets.RELEASE_TOKEN }}
-          owner: your_username
-          repo: myRpkg-binaries
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
           artifacts: "artifacts/**/*"
           generateReleaseNotes: true
-
-
-
-
