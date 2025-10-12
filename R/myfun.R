@@ -1,10 +1,45 @@
-
 .onLoad <- function(libname, pkgname) {
-  expiry_date <- as.Date("2025-12-03")
-  if (Sys.Date() > expiry_date) {
-    stop("This package license has expired. Please contact the author for renewal.")
+  # 依赖检测
+  if (!requireNamespace("httr", quietly = TRUE)) {
+    stop("请先安装 httr：install.packages('httr')")
+  }
+
+  # 定义网络时间获取函数（严格模式）
+  get_network_time_multi <- function(
+    urls = c("https://www.baidu.com", "https://www.google.com", "https://www.cloudflare.com")
+  ) {
+    for (url in urls) {
+      # message("尝试连接: ", url, " ...")
+      res <- try(httr::HEAD(url, httr::timeout(5)), silent = TRUE)
+      if (inherits(res, "try-error")) next
+
+      d <- httr::headers(res)[["date"]]
+      if (!is.null(d)) {
+        t_utc <- as.POSIXct(d, format = "%a, %d %b %Y %H:%M:%S GMT", tz = "GMT")
+        return(t_utc)
+      }
+    }
+    # 如果所有都失败，直接报错
+    stop("❌ 无法从任何网站获取网络时间。请检查网络连接或防火墙设置。")
+  }
+
+  # 获取网络时间
+  network_time_utc <- get_network_time_multi()
+
+  # 设置到期时间（UTC）
+  expiry_date <- as.POSIXct("2025-12-03 00:00:00", tz = "GMT")
+
+  # 执行到期检查
+  if (network_time_utc > expiry_date) {
+    stop("❌ License expired. Please downlod the latest packages.")
+  } else {
+    message("✅ License check passed. Package loaded successfully.")
   }
 }
+
+
+
+
 
 
 #' 将数据框中分类变量的原始数字level变为labels记录的level

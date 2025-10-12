@@ -1,0 +1,90 @@
+name: Build and Release Binary Packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build-binaries:
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      matrix:
+        config:
+          - {os: windows-latest, r: 'release', platform: "windows"}
+          - {os: macos-latest, r: 'release', platform: "macos"}
+          - {os: ubuntu-latest, r: 'release', platform: "linux"}
+    
+    name: Build ${{ matrix.config.platform }} binary
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          use-public-rspm: true
+          
+      - name: Install system dependencies (Linux)
+        if: matrix.config.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
+          
+      - name: Install system dependencies (macOS)
+        if: matrix.config.os == 'macos-latest'
+        run: |
+          brew install pkg-config libcurl openssl libxml2
+          
+      - name: Install dependencies
+        run: |
+          R -e "install.packages(c('devtools', 'roxygen2', 'testthat', 'knitr', 'rmarkdown'))"
+          
+      - name: Build package
+        run: |
+          R -e "devtools::document()"
+          R CMD build . --no-manual --no-build-vignettes
+          R CMD check *tar.gz --no-manual --no-build-vignettes --no-tests
+          
+      - name: Build binary package
+        run: |
+          if [ "${{ matrix.config.platform }}" = "windows" ]; then
+            R CMD INSTALL --build . --no-docs --no-html --no-data --no-help --no-demo --no-inst --no-multiarch
+          else
+            R CMD INSTALL --build . --no-docs --no-html --no-data --no-help --no-demo --no-inst
+          fi
+          
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.config.platform }}-binary
+          path: "*.zip"
+          retention-days: 1
+          
+  create-release:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          
+      - name: List files
+        run: find artifacts -type f
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.tgz
+          generate_release_notes: true
