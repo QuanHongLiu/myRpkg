@@ -1,4 +1,12 @@
 
+.onLoad <- function(libname, pkgname) {
+  expiry_date <- as.Date("2025-12-03")
+  if (Sys.Date() > expiry_date) {
+    stop("This package license has expired. Please contact the author for renewal.")
+  }
+}
+
+
 #' 将数据框中分类变量的原始数字level变为labels记录的level
 #'
 #'
