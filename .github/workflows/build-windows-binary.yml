@@ -11,27 +11,19 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 1️⃣ 拉取仓库代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ 安装 R
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: '4.3.3'
 
-      # 3️⃣ （可选）手动安装 Rtools
-      # - name: Install Rtools
-      #   run: choco install rtools --version=4.3.5835 -y
-
-      # 4️⃣ 安装包依赖
       - name: Install package dependencies
         run: |
           Rscript -e "install.packages('remotes', repos='https://cran.rstudio.com')"
           Rscript -e "remotes::install_deps(dependencies = TRUE)"
 
-      # 5️⃣ 构建 Windows 二进制包
       - name: Build binary package (.zip)
         shell: cmd
         run: |
@@ -39,33 +31,27 @@ jobs:
           R CMD INSTALL --build .
           move *.zip dist\
 
-      # 6️⃣ 上传构建好的包（仅 myRpkg_*.zip）
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-binary
-          path: dist/*.zip
+          path: dist/
 
-      # 7️⃣ 安装 GitHub CLI
       - name: Install GitHub CLI
         shell: pwsh
         run: choco install gh -y
 
-      # 8️⃣ 创建 release 并上传二进制包到 myRpkg_binary 仓库
       - name: Create release and upload package
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
         run: |
-          # 登录 GitHub CLI
           gh auth login --with-token --hostname github.com --token $env:GITHUB_TOKEN
 
-          # 生成 Windows 构建 tag，格式：vRversion-win-年月日
-          $R_VERSION="4.3.3"
-          $TAG="v$R_VERSION-win-$(Get-Date -Format 'yyyyMMdd')"
+          $R_VERSION = "4.3.3"
+          $TAG = "v$R_VERSION-win-$(Get-Date -Format 'yyyyMMdd')"
 
-          # 创建 release 并上传包
           gh release create $TAG dist/*.zip `
             --repo QuanHongLiu/myRpkg_binary `
-            --title "Windows binary for myRpkg ($R_VERSION)" `
-            --notes "Built automatically via GitHub Actions on Windows"
+            --title "Windows binary for myRpkg" `
+            --notes "Built automatically via GitHub Actions"
