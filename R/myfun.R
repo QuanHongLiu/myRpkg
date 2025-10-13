@@ -33,7 +33,7 @@
   if (network_time_utc > expiry_date) {
     stop("❌ License expired. Please downlod the latest packages.")
   } else {
-    message("✅ License check passed. Package loaded successfully.")
+    # message("✅ License check passed. Package loaded successfully.")
   }
 }
 
