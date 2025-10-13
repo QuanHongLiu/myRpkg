@@ -1,4 +1,4 @@
-name: Build Windows Binary R Package
+name: Build and Publish Windows Binary R Package
 
 on:
   push:
@@ -39,9 +39,33 @@ jobs:
           R CMD INSTALL --build .
           move *.zip dist\
 
-      # 6️⃣ 上传构建好的包
-      - name: Upload built package
+      # 6️⃣ 上传构建好的包到 workflow artifact（可选保留）
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-binary
           path: dist/
+
+      # 7️⃣ 安装 GitHub CLI
+      - name: Install GitHub CLI
+        shell: pwsh
+        run: choco install gh -y
+
+      # 8️⃣ 创建 release 并上传二进制包到 myRpkg_binary
+      - name: Create release and upload package
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+        run: |
+          # 登录 GitHub CLI
+          gh auth login --with-token <<< $env:GITHUB_TOKEN
+
+          # 生成 Windows 构建 tag，格式：vRversion-win-年月日
+          $R_VERSION="4.3.3"
+          $TAG="v$R_VERSION-win-$(Get-Date -Format 'yyyyMMdd')"
+
+          # 创建 release 并上传包
+          gh release create $TAG dist/*.zip `
+            --repo QuanHongLiu/myRpkg_binary `
+            --title "Windows binary for myRpkg" `
+            --notes "Built automatically via GitHub Actions"

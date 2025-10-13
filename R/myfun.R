@@ -15,7 +15,11 @@
 
       d <- httr::headers(res)[["date"]]
       if (!is.null(d)) {
-        t_utc <- as.POSIXct(d, format = "%a, %d %b %Y %H:%M:%S GMT", tz = "GMT")
+        original_locale <- Sys.getlocale("LC_TIME")
+        Sys.setlocale("LC_TIME", "C")
+        t_utc <- as.Date(parse_date_time(d, orders = c("a, d b Y H:M:S", "Y-m-d H:M:S")))
+        Sys.setlocale("LC_TIME", original_locale)
+        # 注意：此方法要求字符串中不包含星期几（需手动去掉 "Mon, "）
         return(t_utc)
       }
     }
@@ -27,7 +31,7 @@
   network_time_utc <- get_network_time_multi()
 
   # 设置到期时间（UTC）
-  expiry_date <- as.POSIXct("2025-12-03 00:00:00", tz = "GMT")
+  expiry_date <- as.Date("2025-12-03")
 
   # 执行到期检查
   if (network_time_utc > expiry_date) {
