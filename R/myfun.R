@@ -33,14 +33,13 @@
   }
 
   # 设置到期时间（UTC）
-  expiry_date <- as.Date("2025-12-03")
+  expiry_date <- as.Date("2025-12-31")
 
   # 执行到期检查
   if (network_time_utc > expiry_date) {
     stop("❌ License expired. Please downlod the latest packages.")
   } else {
     message("✅ License check passed. Package loaded successfully.")
-    # load(system.file("R/sysdata.rda", package = pkgname), envir = parent.env(environment()))
   }
 }
 
@@ -393,10 +392,10 @@ extract_model_results_conf <- function(x, y, model = model, results = results, d
 
   # 如果需要exp(β)，转换系数和置信区间; 如果 x 是level 也要; 还可以用于添加case，control，person-years
   res <- add_model_info(model_summary = res,
-                                  model = model,
-                                  data = data,
-                                  x = x,
-                                  y = y)
+                        model = model,
+                        data = data,
+                        x = x,
+                        y = y)
 
   # 合并到 results
   if (is.data.frame(results)) {
@@ -1304,6 +1303,423 @@ handle_outliers <- function(x,
 }
 
 
+
+
+#' 回归分析（自变量为连续型）
+#'
+#' 可以循环自变量和因变量并按一般格式提取结果
+#'
+#' 该函数会执行以下操作：
+#'
+#' 1、遍历 x（暴露）和 y（结局），做连续 + 分类 + 趋势三种回归；如果 n = 0 只做连续型模型
+#'
+#' 2、提取结果；
+#'
+#' 3、整理成 Sheet1 (常用格式) ; Sheet2 (画图格式); Sheet3 (原始格式)
+#'
+#' 4、输出 Excel
+#'
+#' @param data 传入的数据框；默认为 all
+#' @param x_vars 自变量向量
+#' @param y_vars 因变量向量
+#' @param covariates 协变量向量
+#' @param n 分类回归类别数；默认为 4; 如果为 0 则只做连续型模型
+#' @param file 结果输出文件
+#' @param model_fun 模型名；默认 lm 模型，可改为 glm, lmer 等
+#' @param model_args 额外传递给模型的参数
+#' @param extract_fun 提取模型结果时选用的函数方法；默认 extract_model_results_wald，还可选 extract_model_results_conf
+#' @param scale_x 是否对连续型模型的 x 去中心化
+#' @param font 输出 xlsx 时的字体；详见 write_xlsx 函数
+#' @param strata_var 分层变量；默认 NULL, 即不分层
+#' @param results 数据框；默认为一个空的数据框; 还可传入之前结果的 results, 以达到不同分层有不同协变量, 但结果又在同一个表格中
+#' @param all_x_in 逻辑值；是否将所有 x 全部纳入模型, 即当循环某个 x 时, 其它 x 作为协变量；默认 FALSE
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+#' # 线性回归（默认）
+#' out <- run_continuous_regression(data = all,
+#'                                x_vars = c("wbc","neuc"),
+#'                                y_vars = c("fev1","fvc"),
+#'                                covariates = c("age","sex","height"),
+#'                                n = 0,
+#'                                file = "~/exp_lm.xlsx")
+#'
+#' # 广义线性回归（比如 logistic 回归）
+#' out <- run_continuous_regression(data = all,
+#'                                x_vars = c("wbc","neuc"),
+#'                                y_vars = c("disease"),
+#'                                covariates = c("age","sex","height"),
+#'                                n = 4,
+#'                                file = "~/exp_glm.xlsx",
+#'                                model_fun = glm,
+#'                                model_args = list(family = binomial),
+#'                                extract_fun = extract_model_results_conf)
+#'
+#' # 混合效应模型（lme4::lmer）
+#' out <- run_continuous_regression(data = all,
+#'                                x_vars = c("wbc"),
+#'                                y_vars = c("fev1"),
+#'                                covariates = c("nl","xb","sg"),
+#'                                n = 4,
+#'                                file = "~/opp_lmer.xlsx",
+#'                                model_fun = lme4::lmer,
+#'                                model_args = list(REML = FALSE),
+#'                                extract_fun = extract_model_results_wald)
+run_continuous_regression <- function(data = NULL,
+                                      x_vars,
+                                      y_vars,
+                                      covariates,
+                                      n = 4,
+                                      file = NULL,
+                                      model_fun = lm,
+                                      model_args = list(),
+                                      extract_fun = extract_model_results_wald,
+                                      scale_x = FALSE,
+                                      font = "Times New Roman",
+                                      strata_var = NULL,
+                                      results = data.frame(),
+                                      all_x_in = FALSE) {
+
+  # 如果有分层变量
+  if (!is.null(strata_var)) {
+    strata_levels <- levels(data[[strata_var]])
+
+    for (x in x_vars) {
+      for (y in y_vars) {
+        for (index in strata_levels) {
+          # 判断是否所有 x 都同时纳入模型
+          if (all_x_in == TRUE) {
+            covs <- c(covariates, x_vars[x_vars != x])
+          } else {
+            covs <- covariates
+          }
+
+          # 过程显示
+          print(paste0(Sys.time(),' -- 开始 自变量：', x,' 因变量：', y, ' 分层：', strata_var, ' = ', index))
+
+          # 分层数据
+          tmp_df <- data[data[[strata_var]] == index, ]
+          tmp_df <- quartile_cut(tmp_df, x, n)
+
+          # 标准化 x
+          if (scale_x) {tmp_df[[x]] <- scale(tmp_df[[x]])}
+
+          # 临时结果
+          tmp_results <- data.frame()
+
+          # 连续 x
+          formula <- as.formula(paste0(y,'~',x,"+", paste(covs, collapse = "+")))
+          model <- do.call(model_fun, c(list(formula, data = tmp_df), model_args))
+          tmp_results <- do.call(extract_fun, list(x = x, y = y, model = model, results = tmp_results, data = tmp_df))
+
+          if (!n == 0) {
+            # 分类 x
+            formula <- as.formula(paste0(y,'~',x,n,"+", paste(covs, collapse = "+")))
+            model <- do.call(model_fun, c(list(formula, data = tmp_df), model_args))
+            tmp_results <- do.call(extract_fun, list(x = paste0(x,n), y = y, model = model, results = tmp_results, data = tmp_df))
+
+            # P for trend
+            tmp_df[[paste0(x,n)]] <- as.numeric(tmp_df[[paste0(x,n)]])
+            formula <- as.formula(paste0(y,'~',x,n,"+", paste(covs, collapse = "+")))
+            model <- do.call(model_fun, c(list(formula, data = tmp_df), model_args))
+            tmp_results <- do.call(extract_fun, list(x = paste0(x,n), y = y, model = model, results = tmp_results, data = tmp_df))
+            tmp_df[[paste0(x,n)]] <- as.factor(tmp_df[[paste0(x,n)]])
+          }
+
+          # p modification for numeric-numeric
+          origin_formula <- as.formula(paste0(y, '~', x, '*', strata_var, "+", paste(covs, collapse = "+")))
+          origin_model <- do.call(model_fun, c(list(origin_formula, data = data), model_args))
+          crude_formula <- as.formula(paste0(y, '~', x, '+', strata_var, "+", paste(covs, collapse = "+")))
+          crude_model <- do.call(model_fun, c(list(crude_formula, data = data), model_args))
+          anova_result <- anova(crude_model, origin_model)
+          anova_result <- as.data.frame(anova_result)
+          anova_result <- standardize_tidy_names(anova_result)
+          # 从 ANOVA 结果中提取 p 值
+          tmp_results$p_nn <- na.omit(anova_result$p.value)[1]
+
+          # p modification for numeric-factor
+          if (!n == 0) {
+            data <- quartile_cut(data, x, n)
+
+            origin_formula <- as.formula(paste0(y, '~', paste0(x,n), '*', strata_var, "+", paste(covs, collapse = "+")))
+            origin_model <- do.call(model_fun, c(list(origin_formula, data = data), model_args))
+            crude_formula <- as.formula(paste0(y, '~', paste0(x,n), '+', strata_var, "+", paste(covs, collapse = "+")))
+            crude_model <- do.call(model_fun, c(list(crude_formula, data = data), model_args))
+            anova_result <- anova(crude_model, origin_model)
+            anova_result <- as.data.frame(anova_result)
+            anova_result <- standardize_tidy_names(anova_result)
+            # 从 ANOVA 结果中提取 p 值
+            tmp_results$p_nf <- na.omit(anova_result$p.value)[1]
+          }
+
+          # 添加分层信息
+          labels <- attr(data[[strata_var]], "labels")
+          label <- names(labels)[labels == index]
+          tmp_results$strata_var <- paste0(index, ' - ',label)
+          tmp_results$n_strata <- nrow(tmp_df)
+
+          # 合并结果
+          results <- dplyr::bind_rows(results, tmp_results)
+        }
+      }
+    }
+  } else {
+    # 无分层变量的原始逻辑
+    for (x in x_vars) {
+      for (y in y_vars) {
+        # 判断是否所有 x 都同时纳入模型
+        if (all_x_in == TRUE) {
+          covs <- c(covariates, x_vars[x_vars != x])
+        } else {
+          covs <- covariates
+        }
+
+        # 过程显示
+        print(paste0(Sys.time(),' -- 开始 自变量：', x,' 因变量：',y))
+        data <- quartile_cut(data, x, n)
+
+        # 标准化 x
+        if (scale_x) {data[[x]] <- scale(data[[x]])}
+
+        # 连续 x
+        formula <- as.formula(paste0(y,'~',x,"+", paste(covs, collapse = "+")))
+        model <- do.call(model_fun, c(list(formula, data = data), model_args))
+        results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results, data = data))
+
+        if (!n == 0) {
+          # 分类 x
+          formula <- as.formula(paste0(y,'~',x,n,"+", paste(covs, collapse = "+")))
+          model <- do.call(model_fun, c(list(formula, data = data), model_args))
+          results <- do.call(extract_fun, list(x = paste0(x,n), y = y, model = model, results = results, data = data))
+
+          # P for trend
+          data[[paste0(x,n)]] <- as.numeric(data[[paste0(x,n)]])
+          formula <- as.formula(paste0(y,'~',x,n,"+", paste(covs, collapse = "+")))
+          model <- do.call(model_fun, c(list(formula, data = data), model_args))
+          results <- do.call(extract_fun, list(x = paste0(x,n), y = y, model = model, results = results, data = data))
+          data[[paste0(x,n)]] <- as.factor(data[[paste0(x,n)]])
+        }
+      }
+    }
+  }
+  # 格式化
+  results$beta_CI_tidy <- sprintf("%.2f (%.2f, %.2f)", results$estimate, results$conf.low, results$conf.high)
+  if ("p.value" %in% colnames(results)) {results <- results %>% mutate(p.value3 = ifelse(p.value < 0.001, "<0.001", sprintf("%.3f", p.value)))}
+  if ("p_nn" %in% colnames(results)) {results <- results %>% mutate(p_nn3 = ifelse(p_nn < 0.001, "<0.001", sprintf("%.3f", p_nn)))}
+  if ("p_nf" %in% colnames(results)) {results <- results %>% mutate(p_nf3 = ifelse(p_nf < 0.001, "<0.001", sprintf("%.3f", p_nf)))}
+
+  # 整理宽表
+  results_data <- dplyr::select(results, any_of(c("x", "y", "beta_CI_tidy", "p.value3",'case','control','person_years', "strata_var", "n_strata", "p_nn3", "p_nf3")))
+  results_plot <- dplyr::select(results, any_of(c("x", "y", 'estimate', 'conf.low', 'conf.high', 'p.value3','case','control','person_years', "strata_var", "n_strata", "p_nn3", "p_nf3")))
+
+
+  # 无分层变量的原始宽表整理逻辑
+  raw_names_data <- names(results_data)
+  raw_names_plot <- names(results_plot)
+
+  # 重置 n
+  if (n == 0) {n = -1}
+
+  results_data <- as.data.frame(matrix(t(results_data), ncol = (n+2)*ncol(results_data), byrow = TRUE))
+  results_plot <- as.data.frame(matrix(t(results_plot), ncol = (n+2)*ncol(results_plot), byrow = TRUE))
+
+
+  names(results_data) <- unlist(lapply(1:(n+2), function(i) paste(raw_names_data, i, sep = "_")))
+  names(results_plot) <- unlist(lapply(1:(n+2), function(i) paste(raw_names_plot, i, sep = "_")))
+
+  results_data <- dplyr::select(results_data, any_of(c('x_1','y_1', "strata_var_1", "n_strata_1",'beta_CI_tidy_1','p.value3_1','beta_CI_tidy_2',
+                                                       paste0("beta_CI_tidy_", 3:(n+1)), paste0("p.value3_", n+2), 'case_1', 'control_1','person_years_1', "p_nn3_1", "p_nf3_1")))
+  results_plot <- dplyr::select(results_plot, any_of(c('x_1','y_1', "strata_var_1", "n_strata_1",'estimate_1','conf.low_1','conf.high_1','p.value3_1','beta_CI_tidy_2',
+                                                       as.vector(outer(c("estimate", "conf.low", "conf.high"), 3:(n+1), paste, sep = "_")),
+                                                       paste0("p.value3_", n+2), 'case_1', 'control_1','person_years_1', "p_nn3_1", "p_nf3_1")))
+
+
+  # 导出
+  if (!is.null(file)) {
+    write_xlsx(list(Sheet1 = results_data,
+                    Sheet2 = results_plot,
+                    Sheet3 = results),
+               file = file,
+               font = font)
+  }
+
+  return(list(results_data = results_data,
+              results_plot = results_plot,
+              results = results))
+}
+
+
+
+
+#' 回归分析（自变量为分类型）
+#'
+#' 可以循环自变量和因变量并按一般格式提取结果
+#'
+#' 该函数会执行以下操作：
+#'
+#' 1、遍历 x（暴露）和 y（结局）
+#'
+#' 2、提取结果；
+#'
+#' 3、整理成 Sheet1 (常用格式) ; Sheet2 (画图格式); Sheet3 (原始格式)
+#'
+#' 4、输出 Excel
+#'
+#' 注意！！！
+#'
+#' 如果结局为 surv 变量，必须有个事件和时间；如 diabetes_surv, 则需要有个 diabetes_event2, diabetes_time
+#'
+#' @param data 传入的数据框；默认为 all
+#' @param x_vars 自变量向量
+#' @param y_vars 因变量向量
+#' @param covariates 协变量向量
+#' @param file 结果输出文件; 以 .xlsx 结尾
+#' @param model_fun 模型名；默认 lm 模型，可改为 glm, lmer 等
+#' @param model_args 额外传递给模型的参数
+#' @param extract_fun 提取模型结果时选用的函数方法；默认 extract_model_results_wald，还可选 extract_model_results_conf
+#' @param font 输出 xlsx 时的字体；详见 write_xlsx 函数
+#' @param strata_var 分层变量；默认 NULL, 即不分层
+#' @param results 数据框；默认为一个空的数据框; 还可传入之前结果的 results, 以达到不同分层有不同协变量, 但结果又在同一个表格中
+#' @param all_x_in 逻辑值；是否将所有 x 全部纳入模型, 即当循环某个 x 时, 其它 x 作为协变量；默认 FALSE
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+run_categorical_regression <- function(data = NULL,
+                                       x_vars,
+                                       y_vars,
+                                       covariates,
+                                       file = NULL,
+                                       model_fun = lm,
+                                       model_args = list(),
+                                       extract_fun = extract_model_results_wald,
+                                       font = "Times New Roman",
+                                       strata_var = NULL,
+                                       results = data.frame(),
+                                       all_x_in = FALSE) {
+
+  # 如果有分层变量
+  if (!is.null(strata_var)) {
+    strata_levels <- levels(data[[strata_var]])
+
+    for (x in x_vars) {
+      for (y in y_vars) {
+        for (index in strata_levels) {
+          # 判断是否所有 x 都同时纳入模型
+          if (all_x_in == TRUE) {
+            covs <- c(covariates, x_vars[x_vars != x])
+          } else {
+            covs <- covariates
+          }
+
+          # 过程显示
+          print(paste0(Sys.time(),' -- 开始 自变量：', x,' 因变量：', y, ' 分层：', strata_var, ' = ', index))
+
+          # 分层数据
+          tmp_df <- data[data[[strata_var]] == index, ]
+
+          # 确保自变量是因子类型
+          if (!is.factor(tmp_df[[x]])) {
+            tmp_df[[x]] <- as.factor(tmp_df[[x]])
+          }
+
+          # 临时结果
+          tmp_results <- data.frame()
+
+          # 运行回归模型
+          formula <- as.formula(paste0(y, '~', x, "+", paste(covs, collapse = "+")))
+          model <- do.call(model_fun, c(list(formula, data = tmp_df), model_args))
+          tmp_results <- do.call(extract_fun, list(x = x, y = y, model = model, results = tmp_results, data = tmp_df))
+
+          # P for trend
+          data[[x]] <- as.numeric(data[[x]])
+          formula <- as.formula(paste0(y, '~', x, "+", paste(covs, collapse = "+")))
+          model <- do.call(model_fun, c(list(formula, data = data), model_args))
+          tmp_results <- do.call(extract_fun, list(x = x, y = y, model = model, results = tmp_results, data = data))
+          data[[x]] <- as.factor(data[[x]])
+
+          # p modification for factor
+          origin_formula <- as.formula(paste0(y, '~', x, '*', strata_var, "+", paste(covs, collapse = "+")))
+          origin_model <- do.call(model_fun, c(list(origin_formula, data = data), model_args))
+          crude_formula <- as.formula(paste0(y, '~', x, '+', strata_var, "+", paste(covs, collapse = "+")))
+          crude_model <- do.call(model_fun, c(list(crude_formula, data = data), model_args))
+          anova_result <- anova(crude_model, origin_model)
+          anova_result <- as.data.frame(anova_result)
+          anova_result <- standardize_tidy_names(anova_result)
+          # 从 ANOVA 结果中提取 p 值
+          tmp_results$p_ff <- na.omit(anova_result$p.value)[1]
+
+          # 添加分层信息
+          labels <- attr(data[[strata_var]], "labels")
+          label <- names(labels)[labels == index]
+          tmp_results$strata_var <- paste0(index, ' - ',label)
+          tmp_results$n_strata <- nrow(tmp_df)
+
+          # 合并结果
+          results <- dplyr::bind_rows(results, tmp_results)
+        }
+      }
+    }
+  } else {
+    # 无分层变量的原始逻辑
+    for (x in x_vars) {
+      for (y in y_vars) {
+        # 判断是否所有 x 都同时纳入模型
+        if (all_x_in == TRUE) {
+          covs <- c(covariates, x_vars[x_vars != x])
+        } else {
+          covs <- covariates
+        }
+
+        # 过程显示
+        print(paste0(Sys.time(),' -- 开始 自变量：', x,' 因变量：',y))
+
+        # 确保自变量是因子类型
+        if (!is.factor(data[[x]])) {
+          data[[x]] <- as.factor(data[[x]])
+        }
+
+        # 运行回归模型
+        formula <- as.formula(paste0(y, '~', x, "+", paste(covs, collapse = "+")))
+        model <- do.call(model_fun, c(list(formula, data = data), model_args))
+        results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results, data = data))
+
+        # P for trend
+        data[[x]] <- as.numeric(data[[x]])
+        formula <- as.formula(paste0(y, '~', x, "+", paste(covs, collapse = "+")))
+        model <- do.call(model_fun, c(list(formula, data = data), model_args))
+        results <- do.call(extract_fun, list(x = x, y = y, model = model, results = results, data = data))
+        data[[x]] <- as.factor(data[[x]])
+      }
+    }
+  }
+
+  # 格式化结果
+  results$beta_CI_tidy <- sprintf("%.2f (%.2f, %.2f)", results$estimate, results$conf.low, results$conf.high)
+  if ("p.value" %in% colnames(results)) {results <- results %>% mutate(p.value3 = ifelse(p.value < 0.001, "<0.001", sprintf("%.3f", p.value)))}
+  if ("p_ff" %in% colnames(results)) {results <- results %>% mutate(p_ff3 = ifelse(p_ff < 0.001, "<0.001", sprintf("%.3f", p_ff)))}
+
+  # 整理宽表
+  results_data <- dplyr::select(results, any_of(c("x", "y", "strata_var", "n_strata", "beta_CI_tidy", "p.value3", 'case', 'control', 'person_years', "p_ff3")))
+  results_plot <- dplyr::select(results, any_of(c("x", "y", "strata_var", "n_strata", 'estimate', 'conf.low', 'conf.high', 'p.value3', 'case', 'control', 'person_years', "p_ff3")))
+
+
+  # 导出
+  if (!is.null(file)) {
+    write_xlsx(list(Sheet1 = results_data,
+                    Sheet2 = results_plot,
+                    Sheet3 = results),
+               file = file,
+               font = font)
+  }
+
+  return(list(results_data = results_data,
+              results_plot = results_plot,
+              results = results))
+}
 
 
 
