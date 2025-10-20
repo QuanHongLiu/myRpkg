@@ -72,8 +72,8 @@ convert_labels_to_levels <- function(df) {
 
       # 构造新的 factor
       x <- factor(x,
-                  levels = as.character(labs),
-                  labels = names(labs))
+                  levels = names(labs),
+                  labels = as.character(labs))
 
       # 恢复原属性（除了 levels / class / labels）
       keep_attrs <- setdiff(names(old_attrs), c("levels", "class", "labels"))
@@ -575,6 +575,16 @@ quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
     }
   }
 
+  # 检查 n 是否有效
+  if (!is.numeric(n) || length(n) != 1 || n < 0) {
+    stop("n must be a positive integer")
+  }
+
+  # 如果 n = 0，直接返回原始数据
+  if (n == 0) {
+    return(dataframe)
+  }
+
   # 检查输入是否为数据框
   if (!is.data.frame(dataframe)) {
     stop("The input 'dataframe' must be a data frame.")
@@ -587,16 +597,6 @@ quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
   }
   if (!is.numeric(var)) {
     stop("Variable '", var_name_str, "' must be numeric")
-  }
-
-  # 检查 n 是否有效
-  if (!is.numeric(n) || length(n) != 1 || n < 0) {
-    stop("n must be a positive integer")
-  }
-
-  # 如果 n = 0，直接返回原始数据
-  if (n == 0) {
-    return(dataframe)
   }
 
   # 计算唯一分位数
@@ -694,7 +694,7 @@ process_ukb_data <- function(data){
         data[[col_name]] <- as.factor(data[[col_name]])
         coding_map <- codings_showcase[codings_showcase$coding_id == var_coding[[field_id]],]
         # 分类变量 label
-        attr(data[[col_name]],"labels") <- setNames(coding_map$coding, coding_map$meaning)
+        attr(data[[col_name]],"labels") <- setNames(coding_map$meaning, coding_map$coding)
         return(data[[col_name]])
       } else if (var_type[[field_id]] %in%  c("Integer", "Continuous")){
         return(as.numeric(data[[col_name]]))
@@ -1333,6 +1333,7 @@ handle_outliers <- function(x,
 #' @param strata_var 分层变量；默认 NULL, 即不分层
 #' @param results 数据框；默认为一个空的数据框; 还可传入之前结果的 results, 以达到不同分层有不同协变量, 但结果又在同一个表格中
 #' @param all_x_in 逻辑值；是否将所有 x 全部纳入模型, 即当循环某个 x 时, 其它 x 作为协变量；默认 FALSE
+#' @param digits 整数型; 效应值保留小数位数
 #'
 #' @returns
 #' @export
@@ -1380,7 +1381,8 @@ run_continuous_regression <- function(data = NULL,
                                       font = "Times New Roman",
                                       strata_var = NULL,
                                       results = data.frame(),
-                                      all_x_in = FALSE) {
+                                      all_x_in = FALSE,
+                                      digits = 2) {
 
   # 如果有分层变量
   if (!is.null(strata_var)) {
@@ -1505,7 +1507,7 @@ run_continuous_regression <- function(data = NULL,
     }
   }
   # 格式化
-  results$beta_CI_tidy <- sprintf("%.2f (%.2f, %.2f)", results$estimate, results$conf.low, results$conf.high)
+  results$beta_CI_tidy <- sprintf(paste0("%.", digits, "f (%.", digits, "f, %.", digits, "f)"), results$estimate, results$conf.low, results$conf.high)
   if ("p.value" %in% colnames(results)) {results <- results %>% mutate(p.value3 = ifelse(p.value < 0.001, "<0.001", sprintf("%.3f", p.value)))}
   if ("p_nn" %in% colnames(results)) {results <- results %>% mutate(p_nn3 = ifelse(p_nn < 0.001, "<0.001", sprintf("%.3f", p_nn)))}
   if ("p_nf" %in% colnames(results)) {results <- results %>% mutate(p_nf3 = ifelse(p_nf < 0.001, "<0.001", sprintf("%.3f", p_nf)))}
@@ -1583,6 +1585,7 @@ run_continuous_regression <- function(data = NULL,
 #' @param strata_var 分层变量；默认 NULL, 即不分层
 #' @param results 数据框；默认为一个空的数据框; 还可传入之前结果的 results, 以达到不同分层有不同协变量, 但结果又在同一个表格中
 #' @param all_x_in 逻辑值；是否将所有 x 全部纳入模型, 即当循环某个 x 时, 其它 x 作为协变量；默认 FALSE
+#' @param digits 整数型; 效应值保留小数位数
 #'
 #' @returns
 #' @export
@@ -1599,7 +1602,8 @@ run_categorical_regression <- function(data = NULL,
                                        font = "Times New Roman",
                                        strata_var = NULL,
                                        results = data.frame(),
-                                       all_x_in = FALSE) {
+                                       all_x_in = FALSE,
+                                       digits = 2) {
 
   # 如果有分层变量
   if (!is.null(strata_var)) {
@@ -1698,7 +1702,7 @@ run_categorical_regression <- function(data = NULL,
   }
 
   # 格式化结果
-  results$beta_CI_tidy <- sprintf("%.2f (%.2f, %.2f)", results$estimate, results$conf.low, results$conf.high)
+  results$beta_CI_tidy <- sprintf(paste0("%.", digits, "f (%.", digits, "f, %.", digits, "f)"), results$estimate, results$conf.low, results$conf.high)
   if ("p.value" %in% colnames(results)) {results <- results %>% mutate(p.value3 = ifelse(p.value < 0.001, "<0.001", sprintf("%.3f", p.value)))}
   if ("p_ff" %in% colnames(results)) {results <- results %>% mutate(p_ff3 = ifelse(p_ff < 0.001, "<0.001", sprintf("%.3f", p_ff)))}
 

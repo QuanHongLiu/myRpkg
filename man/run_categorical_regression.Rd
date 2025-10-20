@@ -16,7 +16,8 @@ run_categorical_regression(
   font = "Times New Roman",
   strata_var = NULL,
   results = data.frame(),
-  all_x_in = FALSE
+  all_x_in = FALSE,
+  digits = 2
 )
 }
 \arguments{
@@ -43,6 +44,8 @@ run_categorical_regression(
 \item{results}{数据框；默认为一个空的数据框; 还可传入之前结果的 results, 以达到不同分层有不同协变量, 但结果又在同一个表格中}
 
 \item{all_x_in}{逻辑值；是否将所有 x 全部纳入模型, 即当循环某个 x 时, 其它 x 作为协变量；默认 FALSE}
+
+\item{digits}{整数型; 效应值保留小数位数}
 }
 \description{
 可以循环自变量和因变量并按一般格式提取结果
