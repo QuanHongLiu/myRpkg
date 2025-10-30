@@ -1667,7 +1667,7 @@ run_categorical_regression <- function(data = NULL,
 #' @param disease_10_codes_list 单个疾病 icd10 向量，或多个疾病 icd10 向量的 list
 #' @param disease_9_codes_list 单个疾病 icd9 向量，或多个疾病 icd9 向量的 list
 #' @param data 需要处理数据
-#' @param by 字符串；使用住院 summary data, 还是 first occurrences 计算; 默认 summary, 还可选 first
+#' @param by 字符串；使用住院 summary data, 还是 first occurrences 计算; 默认 first, 还可选 summary
 #'
 #' @returns 处理好的数据框
 #' @export
@@ -1694,7 +1694,7 @@ get_first_diseases_date <- function(disease_names,
                                     disease_10_codes_list = list(),
                                     disease_9_codes_list = list(),
                                     data = all,
-                                    by = 'summary') {
+                                    by = 'first') {
   # 兼容：如果不是 list，则转为 list
   if (!is.list(disease_10_codes_list)) {
     disease_10_codes_list <- list(disease_10_codes_list)

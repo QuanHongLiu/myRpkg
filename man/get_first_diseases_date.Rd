@@ -9,7 +9,7 @@ get_first_diseases_date(
   disease_10_codes_list = list(),
   disease_9_codes_list = list(),
   data = all,
-  by = "summary"
+  by = "first"
 )
 }
 \arguments{
@@ -21,7 +21,7 @@ get_first_diseases_date(
 
 \item{data}{需要处理数据}
 
-\item{by}{字符串；使用住院 summary data, 还是 first occurrences 计算; 默认 summary, 还可选 first}
+\item{by}{字符串；使用住院 summary data, 还是 first occurrences 计算; 默认 first, 还可选 summary}
 }
 \value{
 处理好的数据框
