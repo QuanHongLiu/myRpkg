@@ -104,7 +104,6 @@ convert_labels_to_levels <- function(df) {
 #' @param y 因变量
 #'
 #' @returns
-#' @export
 #'
 #' @examples
 add_model_info <- function(model_summary,
@@ -257,7 +256,6 @@ add_model_info <- function(model_summary,
 #' @param df 需要统一的数据框
 #'
 #' @returns 处理好的数据框
-#' @export
 #'
 #' @examples
 standardize_tidy_names <- function(df) {
@@ -295,7 +293,6 @@ standardize_tidy_names <- function(df) {
 #' @param model 拟合的模型对象（如glm, coxph等）
 #'
 #' @returns 逻辑值（TRUE需要取指数，FALSE不需要）
-#' @export
 #'
 #' @examples
 needs_exp <- function(model) {
@@ -371,7 +368,6 @@ needs_exp <- function(model) {
 #' @param data 原始数据框，用给结果添加些额外内容
 #'
 #' @return 结果的数据框
-#' @export
 #'
 #' @examples
 extract_model_results_conf <- function(x, y, model = model, results = results, data = NULL) {
@@ -407,35 +403,6 @@ extract_model_results_conf <- function(x, y, model = model, results = results, d
   # 返回结果
   return(results)
 }
-# extract_model_results_conf <- function(x, y, model = model, results = results) {
-#   # 判断是否需要取指数（exp(β)）
-#   exponentiate <- needs_exp(model)$exponentiate
-#
-#   # 提取模型系数
-#   model_summary <- broom.mixed::tidy(model, conf.int = FALSE, exponentiate = exponentiate)
-#   model_summary <- cbind(y, model_summary)
-#   model_summary <- model_summary[grepl(x, model_summary$term), ]
-#   names(model_summary)[names(model_summary)=='term'] <- 'x'
-#
-#   # 提取模型通过 bootstrap 得到的置信区间
-#   model_confint <- confint(model)
-#   model_confint <- as.data.frame(model_confint)
-#   model_confint <- model_confint[grepl(x, rownames(model_confint)),]
-#
-#   # 合并结果
-#   res <- cbind(model_summary, model_confint)
-#   res <- standardize_tidy_names(res)
-#
-#   # 合并到 results
-#   if (is.data.frame(results)) {
-#     results <- bind_rows(results, res)
-#   } else {
-#     results <- data.frame()
-#     results <- bind_rows(results, res)
-#   }
-#   # 返回结果
-#   return(results)
-# }
 
 
 
@@ -452,7 +419,6 @@ extract_model_results_conf <- function(x, y, model = model, results = results, d
 #' @param data 原始数据框，用给结果添加些额外内容
 #'
 #' @return 结果的数据框
-#' @export
 #'
 #' @examples
 extract_model_results_wald <- function(x, y, model = model, results = results, data = NULL) {
@@ -484,26 +450,6 @@ extract_model_results_wald <- function(x, y, model = model, results = results, d
   # 返回结果
   return(results)
 }
-# extract_model_results_tidy <- function(x, y, model = model, results = results) {
-#   # 判断是否需要取指数（exp(β)）
-#   exponentiate <- needs_exp(model)$exponentiate
-#
-#   # 提取模型系数
-#   model_summary <- broom.mixed::tidy(model, conf.int = TRUE, exponentiate = exponentiate)
-#   model_summary <- cbind(y, model_summary)
-#   model_summary <- model_summary[grepl(x, model_summary$term), ]
-#   names(model_summary)[names(model_summary)=='term'] <- 'x'
-#
-#   if (is.data.frame(results)) {
-#     results <- bind_rows(results, model_summary)
-#   } else {
-#     results <- data.frame()
-#     results <- bind_rows(results, model_summary)
-#   }
-#   # 返回结果
-#   return(results)
-# }
-
 
 
 
@@ -539,6 +485,8 @@ harmonise_types <- function(target_df, reference_df) {
         target_df[[col]] <- as.logical(target_df[[col]])
       } else if (ref_types[[col]] == "integer") {
         target_df[[col]] <- as.integer(target_df[[col]])
+      } else if (ref_types[[col]] == "Date") {
+        target_df[[col]] <- as.Date(target_df[[col]])
       }
     }
   }
@@ -698,13 +646,15 @@ process_ukb_data <- function(data){
         return(data[[col_name]])
       } else if (var_type[[field_id]] %in%  c("Integer", "Continuous")){
         return(as.numeric(data[[col_name]]))
-      } else if (var_type[[field_id]] %in%  c("Date") && grepl("^\\d+$", data[[col_name]][1])){
-        return(as.Date(data[[col_name]],origin = "1960-01-01"))
-      } else if (var_type[[field_id]] %in%  c("Date") && !grepl("^\\d+$", data[[col_name]][1])){
-        return(as.Date(data[[col_name]], format = "%d%b%Y"))
-      } else if (var_type[[field_id]] %in%  c("Time") && grepl("^\\d+$", data[[col_name]][1])){
+      } else if (var_type[[field_id]] %in% c("Date") && grepl("^\\d+$", na.omit(data[[col_name]])[1])) {
+        return(as.Date(data[[col_name]], origin = "1960-01-01"))  # 纯数字 → 天数偏移
+      } else if (var_type[[field_id]] %in% c("Date") && grepl("^\\d{4}-\\d{2}-\\d{2}$", na.omit(data[[col_name]])[1])) {
+        return(as.Date(data[[col_name]]))  # YYYY-MM-DD → 直接转换
+      } else if (var_type[[field_id]] %in% c("Date") && !grepl("^\\d+$", na.omit(data[[col_name]])[1])) {
+        return(as.Date(data[[col_name]], format = "%d%b%Y"))  # 字符格式 → 按 %d%b%Y 解析, 上一个先满足！！
+      } else if (var_type[[field_id]] %in%  c("Time") && grepl("^\\d+$", na.omit(data[[col_name]])[1])){
         return(as.POSIXct(data[[col_name]], origin="1960-01-01 00:00:00", tz="UTC"))
-      } else if (var_type[[field_id]] %in%  c("Time") && !grepl("^\\d+$", data[[col_name]][1])){
+      } else if (var_type[[field_id]] %in%  c("Time") && !grepl("^\\d+$", na.omit(data[[col_name]])[1])){
         return(as.POSIXct(data[[col_name]], format = "%d%b%Y %H:%M:%S"))
       } else {
         return(data[[col_name]])
@@ -743,6 +693,7 @@ process_ukb_data <- function(data){
 
 
 
+
 #' 生成提取 ukb 数据的 sas 代码
 #'
 #' 生成提取 ukb 数据的 sas 代码。需要的 ukb 数据的 field id list，然后生成 sas 代码
@@ -751,7 +702,6 @@ process_ukb_data <- function(data){
 #' @param output_dir_prefix 生成 sas 脚本路径前缀
 #'
 #' @returns
-#' @export
 #'
 #' @examples
 format_sas_code <- function(field_list,output_dir_prefix){
@@ -879,33 +829,10 @@ format_sas_code <- function(field_list,output_dir_prefix){
 
 
 
-#' rename_ukb_data <- function(data, field_list) {
-#'   sapply(names(data), function(col_name) {
-#'     # 按下划线分割当前列名
-#'     x <- unlist(strsplit(col_name, "_"))
-#'
-#'     # 提取第二部分作为字段名（如果有）
-#'     key <- if (length(x) >= 2) x[2] else x[1]
-#'
-#'     # 查找 field_list 中对应的中文名
-#'     if (key %in% names(field_list) && field_list[[key]] != "") {
-#'       paste0(field_list[[key]],
-#'              ifelse(is.na(x[3]), "", x[3]),
-#'              ifelse(is.na(x[4]), "", x[4]))
-#'     } else {
-#'       col_name  # 找不到就返回原列名
-#'     }
-#'   })
-#' }
-
-
-
-
-
 
 #' 合并两个数据框
 #'
-#' 定义合并函数，自动去除前一个df中与新df重复的变量
+#' 定义合并函数，自动去除前一个df中与新df重复的变量, 再 full_join
 #'
 #' @param df1 第一个数据框
 #' @param df2 第二个数据框
@@ -915,7 +842,7 @@ format_sas_code <- function(field_list,output_dir_prefix){
 #' @export
 #'
 #' @examples
-smart_merge <- function(df1, df2, by) {
+smart_merge <- function(df1, df2, by = "n_eid") {
   # 找到除合并键以外的重复列
   common_cols <- intersect(names(df1), names(df2))
   common_cols <- setdiff(common_cols, by)
@@ -941,7 +868,6 @@ smart_merge <- function(df1, df2, by) {
 #' @param output_dir_prefix 原 csv 数据和 field_list xlsx 的路径及文件前缀
 #'
 #' @returns
-#' @export
 #'
 #' @examples
 extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_prefix=""){
@@ -1079,7 +1005,6 @@ extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_pre
 #' @param output_dir_prefix 前处理数据的 source 的 R 脚本文件路径前缀
 #'
 #' @returns res$field_list 和 res$code 是 source 的代码 和 res$add_code 新添加处理的变量
-#' @export
 #'
 #' @examples
 generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_dir_prefix="") {
@@ -1730,7 +1655,7 @@ run_categorical_regression <- function(data = NULL,
 
 
 
-#' 提取疾病第一次发病函数提取发病时间
+#' 提取疾病第一次发病
 #'
 #' 提取 UKB 中疾病的第一次发病时间
 #'
@@ -1742,6 +1667,7 @@ run_categorical_regression <- function(data = NULL,
 #' @param disease_10_codes_list 单个疾病 icd10 向量，或多个疾病 icd10 向量的 list
 #' @param disease_9_codes_list 单个疾病 icd9 向量，或多个疾病 icd9 向量的 list
 #' @param data 需要处理数据
+#' @param by 字符串；使用住院 summary data, 还是 first occurrences 计算; 默认 summary, 还可选 first
 #'
 #' @returns 处理好的数据框
 #' @export
@@ -1767,7 +1693,8 @@ run_categorical_regression <- function(data = NULL,
 get_first_diseases_date <- function(disease_names,
                                     disease_10_codes_list = list(),
                                     disease_9_codes_list = list(),
-                                    data = all) {
+                                    data = all,
+                                    by = 'summary') {
   # 兼容：如果不是 list，则转为 list
   if (!is.list(disease_10_codes_list)) {
     disease_10_codes_list <- list(disease_10_codes_list)
@@ -1779,36 +1706,58 @@ get_first_diseases_date <- function(disease_names,
     disease_names <- c(disease_names)
   }
 
-  data <- as.data.frame(data)   # 防止 data.table 报错
-
-  # icd 10 矩阵
-  icd_mat_10 <- as.matrix(data[, c(grep("^s_41270_0_", names(data), value = TRUE),
-                                   grep("^s_40006_(0|[1-9]|1[0-9]|20)_0$", names(data), value = TRUE)
-  )])
-
-  date_mat_10 <- as.matrix(data[, c(grep("^s_41280_0_", names(data), value = TRUE),
-                                    grep("^s_40005_(0|[1-9]|1[0-9]|20)_0$", names(data), value = TRUE)
-  )])
-
-  # icd 9 矩阵
-  icd_mat_9 <- as.matrix(data[, grep("^s_41271_0_", names(data), value = TRUE)])
-  date_mat_9 <- as.matrix(data[, grep("^s_41281_0_", names(data), value = TRUE)])
-
   # 加载 icd 数据
   data(icd)
+  # 防止 data.table 报错
+  data <- as.data.frame(data)
 
+
+  if (by == 'summary') {
+    # icd 10 矩阵
+    print(paste(Sys.time(), '---- 正在生成 icd_mat_10、date_mat_10 矩阵 '))
+    icd_mat_10 <- as.matrix(data[, c(grep("^s_41270_0_", names(data), value = TRUE),
+                                     grep("^s_40006_", names(data), value = TRUE)
+    )])
+
+    date_mat_10 <- as.matrix(data[, c(grep("^s_41280_0_", names(data), value = TRUE),
+                                      grep("^s_40005_", names(data), value = TRUE)
+    )])
+
+    # icd 9 矩阵
+    icd_mat_9 <- as.matrix(data[, grep("^s_41271_0_", names(data), value = TRUE)])
+    date_mat_9 <- as.matrix(data[, grep("^s_41281_0_", names(data), value = TRUE)])
+  } else if (by == 'first') {
+    # first occr  icd 10 矩阵
+    first_icd_10 <- as.matrix(data[, grep("^s_first_icd10_0_", names(data), value = TRUE)])
+    first_date_10 <- as.matrix(data[, grep("^s_first_date_0_", names(data), value = TRUE)])
+  }
+
+
+  # 每个疾病 挨个
   for (i in seq_along(disease_names)) {
     x <- disease_names[i]
+    print(paste(Sys.time(), '---- 开始生成', x ,'的 first_date'))
     codes_10 <- icd$ICD10[icd$ICD10_cls %in% disease_10_codes_list[[i]]]
+    codes_10 <- na.omit(codes_10)   # 以防万一用户传入 NA
     codes_9  <- icd$ICD9[icd$ICD9_cls %in% disease_9_codes_list[[i]]]
+    codes_9 <- na.omit(codes_9)   # 以防万一用户传入 NA
 
-    # 筛选 ICD10
-    dates_icd10 <- matrix(NA, nrow = nrow(icd_mat_10), ncol = ncol(icd_mat_10))
-    dates_icd10[icd_mat_10 %in% codes_10] <- date_mat_10[icd_mat_10 %in% codes_10]
+    if (by == 'summary') {
+      # 筛选 ICD10
+      dates_icd10 <- matrix(NA, nrow = nrow(icd_mat_10), ncol = ncol(icd_mat_10))
+      dates_icd10[icd_mat_10 %in% codes_10] <- date_mat_10[icd_mat_10 %in% codes_10]
 
-    # 筛选 ICD9
-    dates_icd9 <- matrix(NA, nrow = nrow(icd_mat_9), ncol = ncol(icd_mat_9))
-    dates_icd9[icd_mat_9 %in% codes_9] <- date_mat_9[icd_mat_9 %in% codes_9]
+      # 筛选 ICD9
+      dates_icd9 <- matrix(NA, nrow = nrow(icd_mat_9), ncol = ncol(icd_mat_9))
+      dates_icd9[icd_mat_9 %in% codes_9] <- date_mat_9[icd_mat_9 %in% codes_9]
+    } else if (by == 'first') {
+      # 筛选 ICD10
+      dates_icd10 <- matrix(NA, nrow = nrow(first_icd_10), ncol = ncol(first_icd_10))
+      dates_icd10[first_icd_10 %in% codes_10] <- first_date_10[first_icd_10 %in% codes_10]
+
+      # 筛选 ICD9
+      dates_icd9 <- matrix(NA, nrow = nrow(first_icd_10), ncol = ncol(first_icd_10))
+    }
 
     # 取最早日期
     first_date <- do.call(
@@ -1826,7 +1775,6 @@ get_first_diseases_date <- function(disease_names,
 
   return(data)
 }
-
 
 
 
@@ -1882,17 +1830,19 @@ get_death_causes_date <- function(death_causes,
   death_primary[!is.na(data$s_40001_1_0)] <- as.character(data$s_40001_1_0[!is.na(data$s_40001_1_0)])
 
 
-  # secondary cause of death
+  # secondary cause of death 次要死因
   death_secondary <- as.matrix(data[, grep("^s_40002_0_", names(data), value = TRUE)])
   death_secondary_new <- as.matrix(data[, grep("^s_40002_1_", names(data), value = TRUE)])
-  na_cols <- matrix(NA, nrow = nrow(death_secondary_new), ncol = 5)
-  death_secondary_new <- cbind(death_secondary_new, na_cols)
-  death_secondary[!is.na(data$s_40001_1_0), ] <- death_secondary_new[!is.na(data$s_40001_1_0), ]
+  # 不需要补充了
+  # na_cols <- matrix(NA, nrow = nrow(death_secondary_new), ncol = 5)
+  # death_secondary_new <- cbind(death_secondary_new, na_cols)
+  death_secondary[!is.na(data$s_40002_1_1), ] <- death_secondary_new[!is.na(data$s_40002_1_1), ]
 
   for (i in seq_along(death_causes)) {
     cause <- death_causes[i]
+    print(paste(Sys.time(), '---- 开始生成 death caused by', cause ,'的 first_date'))
     codes <- icd$ICD10[icd$ICD10_cls %in% death_codes_list[[i]]]  # 使用 ICD10 编码
-    codes <- na.omit(codes)
+    codes <- na.omit(codes)   # 以防万一用户传入 NA
 
     # primary_secondary
     primary_match <- death_primary %in% codes
@@ -1919,6 +1869,11 @@ get_death_causes_date <- function(death_causes,
   }
   return(data)
 }
+
+
+
+
+
 
 
 

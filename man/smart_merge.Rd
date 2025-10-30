@@ -2,12 +2,9 @@
 % Please edit documentation in R/myfun.R
 \name{smart_merge}
 \alias{smart_merge}
-\title{rename_ukb_data <- function(data, field_list) {
-sapply(names(data), function(col_name) {
-# 按下划线分割当前列名
-x <- unlist(strsplit(col_name, "_"))}
+\title{合并两个数据框}
 \usage{
-smart_merge(df1, df2, by)
+smart_merge(df1, df2, by = "n_eid")
 }
 \arguments{
 \item{df1}{第一个数据框}
@@ -17,10 +14,5 @@ smart_merge(df1, df2, by)
 \item{by}{通过哪个变量合并}
 }
 \description{
-\if{html}{\out{<div class="sourceCode">}}\preformatted{# 提取第二部分作为字段名（如果有）
-key <- if (length(x) >= 2) x[2] else x[1]
-}\if{html}{\out{</div>}}
-}
-\details{
-
+定义合并函数，自动去除前一个df中与新df重复的变量, 再 full_join
 }

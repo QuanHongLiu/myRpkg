@@ -2,13 +2,14 @@
 % Please edit documentation in R/myfun.R
 \name{get_first_diseases_date}
 \alias{get_first_diseases_date}
-\title{提取疾病第一次发病函数提取发病时间}
+\title{提取疾病第一次发病}
 \usage{
 get_first_diseases_date(
   disease_names,
   disease_10_codes_list = list(),
   disease_9_codes_list = list(),
-  data = all
+  data = all,
+  by = "summary"
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ get_first_diseases_date(
 \item{disease_9_codes_list}{单个疾病 icd9 向量，或多个疾病 icd9 向量的 list}
 
 \item{data}{需要处理数据}
+
+\item{by}{字符串；使用住院 summary data, 还是 first occurrences 计算; 默认 summary, 还可选 first}
 }
 \value{
 处理好的数据框
