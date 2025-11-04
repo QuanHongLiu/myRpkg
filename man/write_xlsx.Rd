@@ -11,6 +11,7 @@ write_xlsx(
   auto_width = TRUE,
   font = "Arial",
   size = 11,
+  n_space = 5,
   ...
 )
 }
@@ -26,6 +27,8 @@ write_xlsx(
 \item{font}{字体；默认 Arial（中文为微软雅黑）；还可选 Times New Roman（中文为宋体）}
 
 \item{size}{字体大小；默认 11}
+
+\item{n_space}{如果是 compareGroup 的对象，那把第一列两个及以上的空格变为几个空格; 默认为 5}
 
 \item{...}{}
 }

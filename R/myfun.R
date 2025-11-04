@@ -259,21 +259,22 @@ quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
 #' @param auto_width 列宽；自动
 #' @param font 字体；默认 Arial（中文为微软雅黑）；还可选 Times New Roman（中文为宋体）
 #' @param size 字体大小；默认 11
+#' @param n_space 如果是 compareGroup 的对象，那把第一列两个及以上的空格变为几个空格; 默认为 5
 #' @param ...
 #'
 #' @returns
 #' @export
 #'
 #' @examples
-write_xlsx <- function(x, file, row_height = 18, auto_width = TRUE, font = "Arial", size = 11, ...) {
-  .write_xlsx(x, file, row_height, auto_width, font, size, ...)
+write_xlsx <- function(x, file, row_height = 18, auto_width = TRUE, font = "Arial", size = 11, n_space = 5, ...) {
+  .write_xlsx(x, file, row_height, auto_width, font, size, n_space, ...)
 }
 
-.write_xlsx <- function(x, file, row_height, auto_width, font, size, ...)
+.write_xlsx <- function(x, file, row_height, auto_width, font, size, n_space, ...)
   UseMethod(".write_xlsx")
 
 
-.write_xlsx.default <- function(x, file, row_height, auto_width, font, size, ...) {
+.write_xlsx.default <- function(x, file, row_height, auto_width, font, size, n_space, ...) {
   exe_Rc <- system.file("bin/write_xlsx.Rc", package = "myRpkg")
   compiler::loadcmp(exe_Rc, env = environment())
 }
@@ -495,8 +496,8 @@ preprocess_ukb_pipline <- function(input_vec, ukb_data_dir="~/rawdata/", output_
 #' # 方法5: IQR 法（2 倍 IQR），改为封顶
 #' handle_outliers(x, method = "iqr", action = "cap", k = 2)
 handle_outliers <- function(x,
-                            method = c("quantile", "fixed", "iqr"),
-                            action = c("cap", "na"),
+                            method = "quantile",
+                            action = "cap",
                             lower = 0.025,
                             upper = 0.975,
                             k = 3,

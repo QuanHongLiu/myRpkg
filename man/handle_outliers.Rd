@@ -6,8 +6,8 @@
 \usage{
 handle_outliers(
   x,
-  method = c("quantile", "fixed", "iqr"),
-  action = c("cap", "na"),
+  method = "quantile",
+  action = "cap",
   lower = 0.025,
   upper = 0.975,
   k = 3,
