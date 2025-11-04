@@ -7,7 +7,7 @@
 get_death_causes_date(
   death_causes,
   death_codes_list = list(),
-  primary_secondary = c("primary", "secondary", "both"),
+  primary_secondary = "primary",
   data = all
 )
 }
