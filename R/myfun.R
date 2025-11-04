@@ -1,4 +1,14 @@
+
+
+
 .onLoad <- function(libname, pkgname) {
+  .onLoad_fun(libname, pkgname)
+}
+
+.onLoad_fun <- function (libname, pkgname)
+  UseMethod(".onLoad_fun")
+
+.onLoad_fun.default <- function(libname, pkgname) {
   # 依赖检测
   if (!requireNamespace("httr", quietly = TRUE)) {
     stop("请先安装 httr：install.packages('httr')")
@@ -49,6 +59,9 @@
 
 
 
+
+
+
 #' 将数据框中分类变量的原始数字level变为labels记录的level
 #'
 #'
@@ -59,35 +72,17 @@
 #'
 #' @examples
 convert_labels_to_levels <- function(df) {
-  # 检查输入
-  if (!is.data.frame(df)) stop("输入必须是 data.frame")
-
-  for (colname in names(df)) {
-    x <- df[[colname]]
-    labs <- attr(x, "labels")
-
-    if (!is.null(labs)) {
-      # 保存旧属性
-      old_attrs <- attributes(x)
-
-      # 构造新的 factor
-      x <- factor(x,
-                  levels = names(labs),
-                  labels = as.character(labs))
-
-      # 恢复原属性（除了 levels / class / labels）
-      keep_attrs <- setdiff(names(old_attrs), c("levels", "class", "labels"))
-      for (a in keep_attrs) {
-        attr(x, a) <- old_attrs[[a]]
-      }
-
-      df[[colname]] <- x
-      message("✅ 转换变量: ", colname)
-    }
-  }
-  return(df)
+  .convert_labels_to_levels(df)
 }
 
+.convert_labels_to_levels <- function (df)
+  UseMethod(".convert_labels_to_levels")
+
+.convert_labels_to_levels.default <- function(df) {
+  exe_Rc <- system.file("bin/convert_labels_to_levels.Rc", package = "myRpkg")
+  compiler::loadcmp(exe_Rc, env = environment())
+  return(df)
+}
 
 
 
@@ -106,11 +101,15 @@ convert_labels_to_levels <- function(df) {
 #' @returns
 #'
 #' @examples
-add_model_info <- function(model_summary,
-                           model,
-                           data,
-                           x,
-                           y) {
+add_model_info <- function(model_summary, model, data, x, y) {
+  .add_model_info(model_summary, model, data, x, y)
+}
+
+.add_model_info <- function(model_summary, model, data, x, y)
+  UseMethod(".add_model_info")
+
+
+.add_model_info.default <- function(model_summary, model, data, x, y) {
   # 小工具：提取前缀
   get_prefix <- function(var) {
     parts <- unlist(strsplit(var, "_"))  # 使用 unlist 将列表转换为向量
@@ -136,7 +135,7 @@ add_model_info <- function(model_summary,
     print('add_model_info  情况 1: x 分类 + y 分类--------------')
     # 添加 reference 行
     df_ref <- data.frame(
-      x = paste0(x,'0.0'), y = y,
+      x = paste0(x,'.ref'), y = y,
       estimate = 1, conf.low = 1, conf.high = 1
     )
 
@@ -192,7 +191,7 @@ add_model_info <- function(model_summary,
   else if (!exp_model_type$exponentiate & x %in% names(model$xlevels)) {
     print('add_model_info 情况 2: x 分类 + y 连续 --------------')
     df_ref <- data.frame(
-      x = paste0(x,'0.0'), y = y,
+      x = paste0(x,'.ref'), y = y,
       estimate = 0, conf.low = 0, conf.high = 0
     )
     model_summary <- bind_rows(df_ref, model_summary)
@@ -259,6 +258,14 @@ add_model_info <- function(model_summary,
 #'
 #' @examples
 standardize_tidy_names <- function(df) {
+  .standardize_tidy_names(df)
+}
+
+.standardize_tidy_names <- function(df)
+  UseMethod(".standardize_tidy_names")
+
+
+.standardize_tidy_names.default <- function(df) {
   # 定义匹配规则（关键词->目标列名）
   name_map <- list(
     estimate   = c("estimate", "est", "coef", "coefficient"),
@@ -296,6 +303,14 @@ standardize_tidy_names <- function(df) {
 #'
 #' @examples
 needs_exp <- function(model) {
+  .needs_exp(model)
+}
+
+.needs_exp <- function(model)
+  UseMethod(".needs_exp")
+
+
+.needs_exp.default <- function(model) {
   # 初始化结果列表
   result <- list(
     exponentiate = FALSE,
@@ -371,6 +386,14 @@ needs_exp <- function(model) {
 #'
 #' @examples
 extract_model_results_conf <- function(x, y, model = model, results = results, data = NULL) {
+  .extract_model_results_conf(x, y, model, results, data)
+}
+
+.extract_model_results_conf <- function(x, y, model, results, data)
+  UseMethod(".extract_model_results_conf")
+
+
+.extract_model_results_conf.default <- function(x, y, model, results, data) {
   # 提取模型系数
   model_summary <- summary(model)$coefficients
   model_summary <- as.data.frame(model_summary) %>% tibble::rownames_to_column(var = "x")
@@ -422,6 +445,14 @@ extract_model_results_conf <- function(x, y, model = model, results = results, d
 #'
 #' @examples
 extract_model_results_wald <- function(x, y, model = model, results = results, data = NULL) {
+  .extract_model_results_wald(x, y, model, results, data)
+}
+
+.extract_model_results_wald <- function(x, y, model, results, data)
+  UseMethod(".extract_model_results_wald")
+
+
+.extract_model_results_wald.default <- function(x, y, model, results, data) {
   # 提取模型系数
   model_summary <- summary(model)$coefficients
   model_summary <- as.data.frame(model_summary) %>% tibble::rownames_to_column(var = "x")
@@ -468,6 +499,14 @@ extract_model_results_wald <- function(x, y, model = model, results = results, d
 #'
 #' @examples
 harmonise_types <- function(target_df, reference_df) {
+  .harmonise_types(target_df, reference_df)
+}
+
+.harmonise_types <- function(target_df, reference_df)
+  UseMethod(".harmonise_types")
+
+
+.harmonise_types.default <- function(target_df, reference_df) {
   # 获取reference_df的列类型
   ref_types <- sapply(reference_df, class)
 
@@ -510,6 +549,14 @@ harmonise_types <- function(target_df, reference_df) {
 #'
 #' @examples
 quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
+  .quartile_cut(dataframe, var_name, n, reverse)
+}
+
+.quartile_cut <- function(dataframe, var_name, n, reverse)
+  UseMethod(".quartile_cut")
+
+
+.quartile_cut.default <- function(dataframe, var_name, n, reverse) {
   # 1. 捕获传入的符号并转为字符串（得到的是“传参的名字”）
   var_sym <- rlang::ensym(var_name)
   var_name_str <- rlang::as_string(var_sym)
@@ -585,13 +632,15 @@ quartile_cut <- function(dataframe, var_name, n, reverse = FALSE) {
 #' @export
 #'
 #' @examples
-write_xlsx <- function(x,
-                       file,
-                       row_height = 18,
-                       auto_width = TRUE,
-                       font = "Arial", #  "Times New Roman",
-                       size = 11,
-                       ...) {
+write_xlsx <- function(x, file, row_height = 18, auto_width = TRUE, font = "Arial", size = 11, ...) {
+  .write_xlsx(x, file, row_height, auto_width, font, size, ...)
+}
+
+.write_xlsx <- function(x, file, row_height, auto_width, font, size, ...)
+  UseMethod(".write_xlsx")
+
+
+.write_xlsx.default <- function(x, file, row_height, auto_width, font, size, ...) {
   wb <- openxlsx::createWorkbook()
 
   style <- openxlsx::createStyle(fontName = font, fontSize = size)
@@ -599,7 +648,15 @@ write_xlsx <- function(x,
   if (!is.list(x) | is.data.frame(x)) {
     x <- as.data.frame(x)
     x <- list(Sheet1 = x)
+  } else if (inherits(x, c("descrTable", "createTable"))) {
+    prefix_file <- sub("\\.xlsx$", "", file)
+    x$descr <- apply(x$descr, c(1, 2), function(para) gsub("±", " ± ", para))
+    compareGroups::export2csv(x, file = paste0(prefix_file,'.csv'))
+    x <- read_csv(file = paste0(prefix_file,'.csv'))
+    file.remove(paste0(prefix_file,'.csv'))
+    x <- list(Sheet1 = x)
   }
+
 
   for (nm in names(x)) {
     openxlsx::addWorksheet(wb, sheetName = nm)
@@ -626,7 +683,15 @@ write_xlsx <- function(x,
 #' @export
 #'
 #' @examples
-process_ukb_data <- function(data){
+process_ukb_data <- function(data) {
+  .process_ukb_data(data)
+}
+
+.process_ukb_data <- function(data)
+  UseMethod(".process_ukb_data")
+
+
+.process_ukb_data.default <- function(data) {
   # 0. 读取 data_showcase 文件
   data_showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Data_Dictionary_Showcase.csv"))
   # 1. 读取 codings_showcase 文件
@@ -704,7 +769,15 @@ process_ukb_data <- function(data){
 #' @returns
 #'
 #' @examples
-format_sas_code <- function(field_list,output_dir_prefix){
+format_sas_code <- function(field_list,output_dir_prefix) {
+  .format_sas_code(field_list,output_dir_prefix)
+}
+
+.format_sas_code <- function(field_list,output_dir_prefix)
+  UseMethod(".format_sas_code")
+
+
+.format_sas_code.default <- function(field_list,output_dir_prefix) {
   # 提取用户需要的 filed 的详细信息
   Dictionary_Showcase <- read_csv(paste0(system.file(package = 'myRpkg'),"/extdata/Data_Dictionary_Showcase.csv"))
   Dictionary_Showcase <- Dictionary_Showcase[Dictionary_Showcase$FieldID %in% field_list, c("FieldID","Field","Field_zh","Notes_zh","ValueType","Units","Stability","Instances","Array")]
@@ -843,6 +916,14 @@ format_sas_code <- function(field_list,output_dir_prefix){
 #'
 #' @examples
 smart_merge <- function(df1, df2, by = "n_eid") {
+  .smart_merge(df1, df2, by)
+}
+
+.smart_merge <- function(df1, df2, by)
+  UseMethod(".smart_merge")
+
+
+.smart_merge.default <- function(df1, df2, by) {
   # 找到除合并键以外的重复列
   common_cols <- intersect(names(df1), names(df2))
   common_cols <- setdiff(common_cols, by)
@@ -870,7 +951,15 @@ smart_merge <- function(df1, df2, by = "n_eid") {
 #' @returns
 #'
 #' @examples
-extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_prefix=""){
+extract_ukb_data <- function(field_list, ukb_data_dir="~/rawdata/", output_dir_prefix="") {
+  .extract_ukb_data(field_list, ukb_data_dir, output_dir_prefix)
+}
+
+.extract_ukb_data <- function(field_list, ukb_data_dir, output_dir_prefix)
+  UseMethod(".extract_ukb_data")
+
+
+.extract_ukb_data.default <- function(field_list, ukb_data_dir, output_dir_prefix) {
   # 用户不输入"eid"也可以
   field_list <- c("eid",field_list)
 
@@ -1008,6 +1097,14 @@ extract_ukb_data <- function(field_list,ukb_data_dir="~/rawdata/",output_dir_pre
 #'
 #' @examples
 generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_dir_prefix="") {
+  .generate_fieldids_code(input_vec, ukb_data_dir, output_dir_prefix)
+}
+
+.generate_fieldids_code <- function(input_vec, ukb_data_dir, output_dir_prefix)
+  UseMethod(".generate_fieldids_code")
+
+
+.generate_fieldids_code.default <- function(input_vec, ukb_data_dir, output_dir_prefix) {
   # 用户可不传入 eid
   input_vec <- c("eid",input_vec)
 
@@ -1084,7 +1181,15 @@ generate_fieldids_code <- function(input_vec, ukb_data_dir="~/rawdata/", output_
 #' @export
 #'
 #' @examples
-preprocess_ukb_pipline <- function(input_vec,ukb_data_dir="~/rawdata/",output_dir_prefix="") {
+preprocess_ukb_pipline <- function(input_vec, ukb_data_dir="~/rawdata/", output_dir_prefix="") {
+  .preprocess_ukb_pipline(input_vec, ukb_data_dir, output_dir_prefix)
+}
+
+.preprocess_ukb_pipline <- function(input_vec, ukb_data_dir, output_dir_prefix)
+  UseMethod(".preprocess_ukb_pipline")
+
+
+.preprocess_ukb_pipline.default <- function(input_vec, ukb_data_dir, output_dir_prefix) {
   # 用户提供field list，找到filed——list和代码
   print(search())
   print("step1 generate_fieldids_code")
@@ -1193,7 +1298,14 @@ handle_outliers <- function(x,
                             upper = 0.975,
                             k = 3,
                             na.rm = TRUE) {
+  .handle_outliers(x, method, action, lower, upper, k, na.rm)
+}
 
+.handle_outliers <- function(x, method, action, lower, upper, k, na.rm)
+  UseMethod(".handle_outliers")
+
+
+.handle_outliers.default <- function(x, method, action, lower, upper, k, na.rm) {
   # 参数验证
   method <- match.arg(method)
   action <- match.arg(action)
@@ -1308,7 +1420,20 @@ run_continuous_regression <- function(data = NULL,
                                       results = data.frame(),
                                       all_x_in = FALSE,
                                       digits = 2) {
+  .run_continuous_regression(data, x_vars, y_vars, covariates, n, file, model_fun,
+                             model_args, extract_fun, scale_x, font, strata_var,
+                             results, all_x_in, digits)
+}
 
+.run_continuous_regression <- function(data, x_vars, y_vars, covariates, n, file, model_fun,
+                                       model_args, extract_fun, scale_x, font, strata_var,
+                                       results, all_x_in, digits)
+  UseMethod(".run_continuous_regression")
+
+
+.run_continuous_regression.default <- function(data, x_vars, y_vars, covariates, n, file, model_fun,
+                                               model_args, extract_fun, scale_x, font, strata_var,
+                                               results, all_x_in, digits) {
   # 如果有分层变量
   if (!is.null(strata_var)) {
     strata_levels <- levels(data[[strata_var]])
@@ -1529,7 +1654,20 @@ run_categorical_regression <- function(data = NULL,
                                        results = data.frame(),
                                        all_x_in = FALSE,
                                        digits = 2) {
+  .run_categorical_regression(data, x_vars, y_vars, covariates, file, model_fun,
+                              model_args, extract_fun, font, strata_var,
+                              results, all_x_in, digits)
+}
 
+.run_categorical_regression <- function(data, x_vars, y_vars, covariates, file, model_fun,
+                                        model_args, extract_fun, font, strata_var,
+                                        results, all_x_in, digits)
+  UseMethod(".run_categorical_regression")
+
+
+.run_categorical_regression.default <- function(data, x_vars, y_vars, covariates, file, model_fun,
+                                                model_args, extract_fun, font, strata_var,
+                                                results, all_x_in, digits) {
   # 如果有分层变量
   if (!is.null(strata_var)) {
     strata_levels <- levels(data[[strata_var]])
@@ -1655,6 +1793,199 @@ run_categorical_regression <- function(data = NULL,
 
 
 
+
+
+
+
+
+
+
+
+#' 循环运行中介分析
+#'
+#' @param data 传入的数据框；默认为 NULL
+#' @param x_vars 自变量向量
+#' @param m_vars 中介变量向量
+#' @param y_vars 因变量向量
+#' @param covariates 协变量向量
+#' @param strata_var 分层变量；默认 NULL, 即不分层
+#' @param mediator_model_fun X → M 使用的模型名；默认 lm 模型，可改为 glm, lmer 等
+#' @param outcome_model_fun X + M → Y 使用的模型名；默认 lm 模型，可改为 glm, lmer 等
+#' @param mediator_model_args 额外传递给 X → M 模型的参数
+#' @param outcome_model_args 额外传递给 X + M → Y 模型的参数
+#' @param sims 蒙特卡罗抽样次数，用于 bootstrap 或准贝叶斯近似法；默认 1000
+#' @param keep_models 逻辑值；输出的结果是否包含模型原始内容
+#' @param file 结果输出文件; 以 .xlsx 结尾
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+run_mediation_analysis <- function(data = NULL,
+                                   x_vars,
+                                   m_vars,
+                                   y_vars,
+                                   covariates = NULL,
+                                   strata_var = NULL,
+                                   mediator_model_fun = stats::lm,
+                                   outcome_model_fun = stats::lm,
+                                   mediator_model_args = list(),
+                                   outcome_model_args = list(),
+                                   sims = 1000,
+                                   keep_models = TRUE,
+                                   file = NULL) {
+  .run_mediation_analysis(data, x_vars, m_vars, y_vars, covariates, strata_var,
+                          mediator_model_fun, outcome_model_fun, mediator_model_args,
+                          outcome_model_args, sims, keep_models, file)
+}
+
+.run_mediation_analysis <- function(data, x_vars, m_vars, y_vars, covariates, strata_var,
+                                    mediator_model_fun, outcome_model_fun, mediator_model_args,
+                                    outcome_model_args, sims, keep_models, file)
+  UseMethod(".run_mediation_analysis")
+
+
+.run_mediation_analysis.default <- function(data, x_vars, m_vars, y_vars, covariates, strata_var,
+                                            mediator_model_fun, outcome_model_fun, mediator_model_args,
+                                            outcome_model_args, sims, keep_models, file) {
+  results_list <- list()
+  results_summary <- list()
+
+  strata_levels <- if (!is.null(strata_var)) levels(data[[strata_var]]) else NA
+
+  for (x in x_vars) {
+    for (m in m_vars) {
+      for (y in y_vars) {
+        for (s in strata_levels) {
+
+          if (!is.na(s)) {
+            tmp_data <- data[data[[strata_var]] == s, ]
+            strata_label <- paste0(strata_var, "=", s)
+          } else {
+            tmp_data <- data
+            strata_label <- NA
+          }
+
+          message(Sys.time(), " -- 开始：", x, " → ", m, " → ", y,
+                  ifelse(is.na(strata_label), "", paste0(" [", strata_label, "]")))
+
+          # # Step 0. prepare data
+          # message(Sys.time(), "    Step 0. prepare data")
+          # # 确保 fitM 和 fitY 使用完全相同行
+          # vars_used <- unique(c(x, m, y, covariates))
+          # tmp_data <- tmp_data %>%
+          #   dplyr::select(all_of(vars_used)) %>%
+          #   stats::na.omit()
+          # if (nrow(tmp_data) == 0) {
+          #   warning(paste("跳过组合：", x, m, y, "（所有数据缺失）"))
+          #   next
+          # }
+
+          # Step 1: 中介模型
+          message(Sys.time(), "    Step 1: 中介模型")
+          med_formula <- as.formula(paste(m, "~", x,
+                                          if (!is.null(covariates)) paste("+", paste(covariates, collapse = "+"))))
+          fitM <- tryCatch({
+            do.call(mediator_model_fun, c(list(formula = med_formula, data = tmp_data), mediator_model_args))
+          }, error = function(e) NULL)
+
+          # 针对生存结局的优化
+          y_is_surv <- inherits(tmp_data[[y]], "Surv") || grepl("_surv$", y)
+          if (y_is_surv) {
+            outcome_model_fun <- survival::survreg
+            outcome_model_args <- modifyList(list(dist = "weibull"), outcome_model_args)
+          }
+
+          # Step 2: 结果模型
+          message(Sys.time(), "    Step 2: 结果模型")
+          out_formula <- as.formula(paste(y, "~", x, "+", m,
+                                          if (!is.null(covariates)) paste("+", paste(covariates, collapse = "+"))))
+          fitY <- tryCatch({
+            do.call(outcome_model_fun, c(list(formula = out_formula, data = tmp_data), outcome_model_args))
+          }, error = function(e) NULL)
+
+          if (is.null(fitM) || is.null(fitY)) {
+            warning(paste("跳过组合：", x, m, y, "（模型拟合失败）"))
+            next
+          }
+
+          # Step 3: 中介分析
+          message(Sys.time(), "    Step 3: 中介分析")
+          med_res <- tryCatch({
+            mediation::mediate(fitM, fitY, treat = x, mediator = m, sims = sims, dropobs = TRUE)
+          }, error = function(e) NULL)
+
+          if (is.null(med_res)) {
+            warning(paste("跳过组合：", x, m, y, "（mediate运行失败）"))
+            next
+          }
+
+          # Step 4: 汇总
+          message(Sys.time(), "    Step 4: 汇总")
+          sm <- summary(med_res)
+          tmp_summary <- data.frame(
+            exposure = x,
+            mediator = m,
+            outcome = y,
+            strata = strata_label,
+            n = nrow(tmp_data),
+            acme_est = sm$d0,                 # ACME 平均中介效应
+            # acme_ci_low = sm$d0.ci[1],
+            # acme_ci_high = sm$d0.ci[2],
+            ade_est = sm$z0,                  # ADE 平均直接效应
+            # ade_ci_low = sm$z0.ci[1],
+            # ade_ci_high = sm$z0.ci[2],
+            total_est = sm$tau.coef,          # TE 总效应
+            # total_ci_low = sm$tau.ci[1],
+            # total_ci_high = sm$tau.ci[2],
+            prop_med = sm$n0,                 # 中介比例
+            # prop_med_ci_low = sm$n0.ci[1],
+            # prop_med_ci_high = sm$n0.ci[2],
+            p_acme = sm$d0.p,                 # ACME 显著性
+            # p_ade = sm$z0.p,                  # ADE 显著性
+            # p_total = sm$tau.p,               # 总效应的显著性检验
+            model_type = ifelse(y_is_surv, "AFT (Weibull)", "Linear")
+          )
+
+          results_summary <- append(results_summary, list(tmp_summary))
+          key <- paste(x, m, y, strata_label, sep = "|")
+          if (keep_models)
+            results_list[[key]] <- list(mediate = med_res, fitM = fitM, fitY = fitY)
+        }
+      }
+    }
+  }
+
+  # 合并结果
+  if (length(results_summary) > 0) {
+    results_summary <- dplyr::bind_rows(results_summary) %>%
+      dplyr::select(any_of(c(
+        "exposure", "mediator", "outcome", "strata", "n",
+        "acme_est", "acme_ci_low", "acme_ci_high",
+        "ade_est", "ade_ci_low", "ade_ci_high",
+        "total_est", "total_ci_lowm", "total_ci_high",
+        "prop_med", "prop_med_ci_low", "prop_med_ci_high",
+        "p_acme", "p_ade", "p_total", "model_type"
+      )))
+  } else {
+    results_summary <- data.frame()
+  }
+
+  # 导出结果
+  if (!is.null(file)) {
+    myRpkg::write_xlsx(results_summary, file, font = "Times New Roman")
+  }
+
+  return(list(summary = results_summary, details = results_list))
+}
+
+
+
+
+
+
+
+
 #' 提取疾病第一次发病
 #'
 #' 提取 UKB 中疾病的第一次发病时间
@@ -1695,6 +2026,14 @@ get_first_diseases_date <- function(disease_names,
                                     disease_9_codes_list = list(),
                                     data = all,
                                     by = 'first') {
+  .get_first_diseases_date(disease_names, disease_10_codes_list, disease_9_codes_list, data, by)
+}
+
+.get_first_diseases_date <- function(disease_names, disease_10_codes_list, disease_9_codes_list, data, by)
+  UseMethod(".get_first_diseases_date")
+
+
+.get_first_diseases_date.default <- function(disease_names, disease_10_codes_list, disease_9_codes_list, data, by) {
   # 兼容：如果不是 list，则转为 list
   if (!is.list(disease_10_codes_list)) {
     disease_10_codes_list <- list(disease_10_codes_list)
@@ -1716,20 +2055,20 @@ get_first_diseases_date <- function(disease_names,
     # icd 10 矩阵
     print(paste(Sys.time(), '---- 正在生成 icd_mat_10、date_mat_10 矩阵 '))
     icd_mat_10 <- as.matrix(data[, c(grep("^s_41270_0_", names(data), value = TRUE),
-                                     grep("^s_40006_", names(data), value = TRUE)
-    )])
+                                     grep("^s_40006_", names(data), value = TRUE))])
 
     date_mat_10 <- as.matrix(data[, c(grep("^s_41280_0_", names(data), value = TRUE),
-                                      grep("^s_40005_", names(data), value = TRUE)
-    )])
+                                      grep("^s_40005_", names(data), value = TRUE))])
 
     # icd 9 矩阵
     icd_mat_9 <- as.matrix(data[, grep("^s_41271_0_", names(data), value = TRUE)])
     date_mat_9 <- as.matrix(data[, grep("^s_41281_0_", names(data), value = TRUE)])
   } else if (by == 'first') {
     # first occr  icd 10 矩阵
-    first_icd_10 <- as.matrix(data[, grep("^s_first_icd10_0_", names(data), value = TRUE)])
-    first_date_10 <- as.matrix(data[, grep("^s_first_date_0_", names(data), value = TRUE)])
+    first_icd_10 <- as.matrix(data[, c(grep("^s_first_icd10_0_", names(data), value = TRUE),
+                                       grep("^s_40006_", names(data), value = TRUE))])
+    first_date_10 <- as.matrix(data[, c(grep("^s_first_date_0_", names(data), value = TRUE),
+                                        grep("^s_40005_", names(data), value = TRUE))])
   }
 
 
@@ -1812,6 +2151,14 @@ get_death_causes_date <- function(death_causes,
                                   death_codes_list = list(),
                                   primary_secondary = c("primary", "secondary", "both"),
                                   data = all) {
+  .get_death_causes_date(death_causes, death_codes_list, primary_secondary, data)
+}
+
+.get_death_causes_date <- function(death_causes, death_codes_list, primary_secondary, data)
+  UseMethod(".get_death_causes_date")
+
+
+.get_death_causes_date.default <- function(death_causes, death_codes_list, primary_secondary, data) {
   # 参数检查
   primary_secondary <- match.arg(primary_secondary)
   if (!is.list(death_codes_list)) {
@@ -1861,7 +2208,6 @@ get_death_causes_date <- function(death_causes,
     # 填充日期字段
     data[[paste0('death_', cause, '_date')]] <- as.Date(NA)
     data[[paste0('death_', cause, '_date')]][target_rows] <- data$s_40000_0_0[target_rows]
-    class(data$death_diabetes_date)
 
     # 写入结果
     attr(data[[paste0('death_', cause, '_date')]], "label") <- paste0("Date of death caused by ", cause)
