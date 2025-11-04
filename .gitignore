@@ -5,6 +5,4 @@
 .RData
 .DS_Store
 /*.tar.gz
-R_orig/
-pipeline.R
-testR/
+
