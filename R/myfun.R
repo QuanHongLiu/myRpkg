@@ -18,6 +18,50 @@
 
 
 
+#' 获取本机 token
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+my_token <- function() {
+  .my_token()
+}
+
+.my_token <- function ()
+  UseMethod(".my_token")
+
+.my_token.default <- function() {
+  exe_Rc <- system.file("bin/my_token.Rc", package = "myRpkg")
+  compiler::loadcmp(exe_Rc, env = environment())
+  return(code)
+}
+
+
+
+#' Title
+#'
+#' @param module
+#' @param pkg_key
+#'
+#' @returns
+#'
+#' @examples
+checkAccess <- function(module = "module", pkg_key = 'pkg_key') {
+  .checkAccess(module, pkg_key)
+}
+
+.checkAccess <- function (module, pkg_key)
+  UseMethod(".checkAccess")
+
+.checkAccess.default <- function(module, pkg_key) {
+  exe_Rc <- system.file("bin/checkAccess.Rc", package = "myRpkg")
+  compiler::loadcmp(exe_Rc, env = environment())
+  return(fun_key)
+}
+
+
+
 
 
 #' 将数据框中分类变量的原始数字level变为labels记录的level
