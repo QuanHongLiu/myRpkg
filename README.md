@@ -8,5 +8,6 @@ devtools::install_github("QuanHongLiu/myRpkg")
 my_token()
 
 # 等待作者确认使用权限后重新安装 R 包
+detach("package:myRpkg", unload = TRUE)
 devtools::install_github("QuanHongLiu/myRpkg")
 ```
